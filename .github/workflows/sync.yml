@@ -2,11 +2,11 @@ name: sync
 on: push
 jobs:
   sync:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - env:
-          TOKEN: ${{ secrets.SYNC_TOKEN }}
-        run: git push --prune --force https://x-access-token:$TOKEN@github.com/360fininvestcom-blip/360CRM.git +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*
+      runs-on: ubuntu-latest
+          steps:
+                - uses: actions/checkout@v4
+                        with:
+                                  fetch-depth: 0
+                                        - env:
+                                                  TOKEN: ${{ secrets.B_PAT }}
+                                                          run: git push --prune --force https://x-access-token:$TOKEN@github.com/360fininvestcom-blip/360CRM.git +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*
