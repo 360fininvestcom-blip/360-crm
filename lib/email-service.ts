@@ -102,7 +102,20 @@ export async function sendEmail({
         // Update record with tracked body
         await getSupabaseAdmin().from('emails').update({ body_html: trackedBody }).eq('id', emailRecord.id);
 
-        // 6. Send via Nodemailer
+        // 6. Generate plain-text fallback and List-Unsubscribe headers
+        const listUnsubscribeUrl = `${baseUrl}/api/public/unsubscribe?email=${encodeURIComponent(to)}&org=${organizationId}`;
+        
+        // Append visual unsubscribe footer
+        const unsubscribeFooter = `
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center; font-family: sans-serif;">
+                <p>You are receiving this email because you are subscribed to updates. <br>
+                <a href="${listUnsubscribeUrl}" style="color: #999; text-decoration: underline;">Unsubscribe from this list</a></p>
+            </div>
+        `;
+        const bodyWithFooter = trackedBody + unsubscribeFooter;
+        
+        const plainTextBody = bodyWithFooter.replace(/<[^>]*>?/gm, '\n').replace(/\n\s*\n/g, '\n').trim();
+
         const transporter = nodemailer.createTransport({
             host: account.smtp_host,
             port: account.smtp_port,
@@ -120,7 +133,12 @@ export async function sendEmail({
             from: `"${account.name || account.smtp_user}" <${account.email_addr || account.smtp_user}>`,
             to,
             subject: finalSubject,
-            html: trackedBody,
+            html: bodyWithFooter,
+            text: plainTextBody,
+            headers: {
+                'List-Unsubscribe': `<${listUnsubscribeUrl}>`,
+                'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+            }
         });
 
         // 7. Log Activity

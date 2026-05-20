@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useDialerStore } from "@/lib/stores";
+import type { SIPProfile } from "@/types";
 
 export function SipProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
@@ -59,7 +60,7 @@ export function SipProvider({ children }: { children: React.ReactNode }) {
 
             if (sipProfiles && sipProfiles.length > 0) {
                 console.log(`[SIP] Found ${sipProfiles.length} active profiles:`, sipProfiles);
-                sipProfiles.forEach(sipProfile => {
+                (sipProfiles as SIPProfile[]).forEach(sipProfile => {
                     console.log(`[SIP] Raw DB Profile for ${sipProfile.sip_username}:`, {
                         websocket_server: sipProfile.websocket_server,
                         outbound_proxy: sipProfile.outbound_proxy,
@@ -115,6 +116,7 @@ export function SipProvider({ children }: { children: React.ReactNode }) {
                         sip_domain: sipProfile.sip_domain,
                         janus_url: sipProfile.janus_url || undefined,
                         janus_secret: sipProfile.janus_secret || undefined,
+                        engine: sipProfile.engine || "janus",
                     }, sipProfile.id);
 
                     // If this is the default account, set it in the store

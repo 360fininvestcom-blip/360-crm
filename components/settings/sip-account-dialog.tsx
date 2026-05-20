@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Loader2, Phone, Server, Star } from "lucide-react";
+import { Loader2, Phone, Server, Star, Globe } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -40,6 +40,7 @@ interface SipFormData {
     sip_protocol: string;
     outbound_proxy: string;
     registrar_server: string;
+    engine: "janus" | "crococall" | "jssip";
     is_default: boolean;
 }
 
@@ -66,6 +67,7 @@ export function SipAccountDialog({
             sip_protocol: "wss",
             outbound_proxy: "",
             registrar_server: "",
+            engine: "janus",
             is_default: false,
         }
     });
@@ -83,6 +85,7 @@ export function SipAccountDialog({
                 sip_protocol: account.sip_protocol || "wss",
                 outbound_proxy: account.outbound_proxy || "",
                 registrar_server: account.registrar_server || "",
+                engine: account.engine || "janus",
                 is_default: account.is_default || false,
             });
         } else if (!account && open) {
@@ -94,6 +97,7 @@ export function SipAccountDialog({
                 sip_domain: "",
                 outbound_proxy: "",
                 registrar_server: "",
+                engine: "janus",
                 is_default: false,
             });
         }
@@ -112,6 +116,7 @@ export function SipAccountDialog({
                 outbound_proxy: data.outbound_proxy || undefined,
                 registrar_server: data.registrar_server || undefined,
                 janus_url: "wss://sip.nanocall.space:8989", // Janus Secure WebSocket on port 8989
+                engine: data.engine,
                 is_default: data.is_default,
                 is_active: true,
             };
@@ -162,6 +167,35 @@ export function SipAccountDialog({
                                 placeholder="e.g. Work SIP, Personal Line"
                             />
                             <p className="text-xs text-muted-foreground">A friendly name to identify this account</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="engine">Call Engine / Provider</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    type="button"
+                                    variant={form.watch("engine") === "janus" ? "default" : "outline"}
+                                    className="justify-start gap-2"
+                                    onClick={() => form.setValue("engine", "janus")}
+                                >
+                                    <Server className="h-4 w-4" />
+                                    Janus Bridge
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={form.watch("engine") === "crococall" ? "default" : "outline"}
+                                    className="justify-start gap-2"
+                                    onClick={() => form.setValue("engine", "crococall")}
+                                >
+                                    <Globe className="h-4 w-4" />
+                                    Crococall API
+                                </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                                {form.watch("engine") === "janus" 
+                                    ? "Recommended. Uses our high-performance secure bridge." 
+                                    : "Direct connection to Crococall WebRTC services."}
+                            </p>
                         </div>
 
                         <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">

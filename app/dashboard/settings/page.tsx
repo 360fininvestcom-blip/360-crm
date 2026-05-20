@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useActiveProfile, useUpdateProfile, useOrganization, useUpdateOrganization, useApiKeys, useUpdateApiKeys, useIntegrations, useSyncCalendar, useUpdatePassword, useDeleteUserAccountFinal } from "@/hooks/use-settings";
 import { EmailAccountManager } from "@/components/settings/email-account-manager";
 import { SipAccountManager } from "@/components/settings/sip-account-manager";
+import { TwilioSettings } from "@/components/dashboard/twilio-settings";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, RefreshCw, CheckCircle2 } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
@@ -412,6 +413,7 @@ function SettingsContent() {
 
                                             <div className="bg-muted/30 rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center">
                                                 {orgForm.watch("logo_url") ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
                                                     <img 
                                                         src={orgForm.watch("logo_url")} 
                                                         alt="Logo Preview" 
@@ -682,6 +684,7 @@ function SettingsContent() {
                         {isAdmin && (
                             <>
                                 <EmailAccountManager orgId={profile.organization_id} />
+                                <TwilioSettings orgId={profile.organization_id} />
 
                                 <Card>
                                     <CardHeader>

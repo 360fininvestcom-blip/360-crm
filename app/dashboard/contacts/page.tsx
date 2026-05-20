@@ -60,9 +60,10 @@ import { ContactFilters, type ContactFilterValues } from "@/components/contacts/
 import { ImportDialog } from "@/components/contacts/import-dialog";
 import { StatusManagementDialog } from "@/components/contacts/status-management-dialog";
 import { BulkEmailDialog } from "@/components/contacts/bulk-email-dialog";
+import { BulkSmsDialog } from "@/components/contacts/bulk-sms-dialog";
 import type { Contact } from "@/types";
 import { useDialerStore } from "@/lib/stores";
-import { UserCheck, Play } from "lucide-react";
+import { UserCheck, Play, MessageSquare } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls"; // Helper
 import { createClient } from "@/lib/supabase/client"; // Direct fetching for bulk ops
 
@@ -84,6 +85,7 @@ export default function ContactsPage() {
     const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
     const [composerOpen, setComposerOpen] = useState(false);
     const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+    const [bulkSmsOpen, setBulkSmsOpen] = useState(false);
     const [composerContact, setComposerContact] = useState<{ email: string, name?: string } | null>(null);
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -496,6 +498,10 @@ export default function ContactsPage() {
                                         <Mail className="h-4 w-4 mr-2" />
                                         Email
                                     </Button>
+                                    <Button variant="outline" onClick={() => setBulkSmsOpen(true)}>
+                                        <MessageSquare className="h-4 w-4 mr-2" />
+                                        SMS
+                                    </Button>
                                     <Button variant="outline" onClick={() => setEnrollDialogOpen(true)}>
                                         <Mail className="h-4 w-4 mr-2" />
                                         Enroll
@@ -794,6 +800,18 @@ export default function ContactsPage() {
             <BulkEmailDialog
                 open={bulkEmailOpen}
                 onOpenChange={setBulkEmailOpen}
+                contactIds={selectedContacts}
+                isSelectAllMatching={isSelectAllMatching}
+                totalMatches={totalItems}
+                filters={filters}
+                onSuccess={() => {
+                    setSelectedContacts([]);
+                    setIsSelectAllMatching(false);
+                }}
+            />
+            <BulkSmsDialog
+                open={bulkSmsOpen}
+                onOpenChange={setBulkSmsOpen}
                 contactIds={selectedContacts}
                 isSelectAllMatching={isSelectAllMatching}
                 totalMatches={totalItems}

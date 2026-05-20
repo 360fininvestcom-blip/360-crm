@@ -196,6 +196,7 @@ export interface SIPProfile {
     janus_secret?: string; // Janus API secret
     sip_auth_user?: string; // Authorization username
     sip_protocol?: string; // Connection protocol (wss, ws)
+    engine?: "janus" | "crococall" | "jssip"; // WebRTC/SIP engine
     sip_password_encrypted?: string; // Stored encrypted in DB
     is_default: boolean;  // Primary account for this user
     is_active: boolean;

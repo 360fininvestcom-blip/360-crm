@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
     const isAuthRoute =
         request.nextUrl.pathname.startsWith("/login") ||
         request.nextUrl.pathname.startsWith("/signup");
+    const isRootRoute = request.nextUrl.pathname === "/";
 
     // Protect dashboard routes - redirect unauthenticated users to login
     if (isDashboardRoute && !user) {
@@ -47,7 +48,7 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
     }
 
-    if (isAuthRoute && user) {
+    if ((isAuthRoute || isRootRoute) && user) {
         const url = request.nextUrl.clone();
         url.pathname = "/dashboard";
         return NextResponse.redirect(url);

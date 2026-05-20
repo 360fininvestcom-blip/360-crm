@@ -20,6 +20,7 @@ interface SipConfig {
     sip_domain?: string;
     janus_url?: string;
     janus_secret?: string;
+    engine?: "janus" | "crococall" | "jssip";
 }
 
 // Declare global type for window storage
@@ -105,36 +106,56 @@ export class SipService {
             return;
         }
 
-        // --- Universal Janus Bridge Implementation ---
-        const bridgeUrl = config.janus_url || "wss://sip.nanocall.space:8989";
-        try {
-            console.log(`[SIP] Connecting via Janus Bridge for ${id}: ${bridgeUrl}`);
-            const { JanusUA: JanusUAImpl } = await import("@/lib/janus/janus-ua");
-            const janusUa = new JanusUAImpl({
-                uri: config.uri,
-                password: config.password,
-                auth_user: config.auth_user,
-                display_name: config.display_name,
-                janus_url: bridgeUrl,
-                janus_secret: config.janus_secret,
-                proxy: config.registrar_server || config.sip_domain
-            }) as any;
+        // --- Engine-based Implementation ---
+        const engine = config.engine || "janus";
+        
+        if (engine === "janus") {
+            const bridgeUrl = config.janus_url || "wss://sip.nanocall.space:8989";
+            try {
+                console.log(`[SIP] Connecting via Janus Bridge for ${id}: ${bridgeUrl}`);
+                const { JanusUA: JanusUAImpl } = await import("@/lib/janus/janus-ua");
+                const janusUa = new JanusUAImpl({
+                    uri: config.uri,
+                    password: config.password,
+                    auth_user: config.auth_user,
+                    display_name: config.display_name,
+                    janus_url: bridgeUrl,
+                    janus_secret: config.janus_secret,
+                    proxy: config.registrar_server || config.sip_domain
+                }) as any;
 
-            this.uas.set(id, janusUa);
-            this.setupJanusHandlers(id, janusUa);
+                this.uas.set(id, janusUa);
+                this.setupJanusHandlers(id, janusUa);
 
-            // Forward quality events
-            janusUa.on("quality", (quality: string) => {
-                window.dispatchEvent(new CustomEvent("sip:call:quality", { detail: { quality } }));
-            });
+                // Forward quality events
+                janusUa.on("quality", (quality: string) => {
+                    window.dispatchEvent(new CustomEvent("sip:call:quality", { detail: { quality } }));
+                });
 
-            await janusUa.register();
-
+                await janusUa.register();
+                if (!this._activeUAId) this._activeUAId = id;
+                return;
+            } catch (err) {
+                console.error(`[SIP] Janus connection failed for ${id}:`, err);
+                toast.error("Failed to connect to Janus Bridge");
+                return;
+            }
+        } else if (engine === "crococall") {
+            // --- Crococall Direct WebRTC Implementation ---
+            // This is where you would integrate the Crococall SDK or custom signaling
+            console.log(`[SIP] Connecting via Crococall API for ${id}`);
+            toast.info("Connecting via Crococall API...");
+            
+            // Placeholder: For now we'll simulate or use a generic UA if they support SIP
+            // If they support SIP, we could reuse JsSIP here.
+            this.enableDemoMode(id);
             if (!this._activeUAId) this._activeUAId = id;
             return;
-        } catch (err) {
-            console.error(`[SIP] Janus connection failed for ${id}:`, err);
-            toast.error("Failed to connect to Janus Bridge");
+        } else {
+            // Fallback to standard JsSIP
+            console.log(`[SIP] Connecting via Standard JsSIP for ${id}`);
+            // ... (standard JsSIP implementation could go here)
+            this.enableDemoMode(id);
             return;
         }
 
@@ -497,7 +518,7 @@ export class SipService {
             const errorCode = dataObj?.error_code || result?.error_code || result?.code;
             const errorMsg = dataObj?.error || result?.error || result?.reason || "Unknown SIP error";
             
-            console.error(`[SIP] ❌ Janus registration failed for ${id}: Error ${errorCode}: ${errorMsg}`);
+            console.warn(`[SIP] ❌ Janus registration failed for ${id}: Error ${errorCode}: ${errorMsg}`);
             this._isRegistered.set(id, false);
             toast.error(`SIP Registration failed: ${errorMsg}`);
         });

@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { sendEmail } from '@/lib/email-service';
 
 export async function POST(request: Request) {
     try {
         const payload = await request.json();
-        const { subject, body, contactIds, isSelectAllMatching, filters } = payload;
+        const { message, contactIds, isSelectAllMatching, filters } = payload;
 
-        if (!subject || !body) {
-            return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 });
+        if (!message) {
+            return NextResponse.json({ error: 'Message body is required' }, { status: 400 });
         }
 
         const cookieStore = await cookies();
@@ -18,42 +17,47 @@ export async function POST(request: Request) {
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             {
                 cookies: {
-                    get(name: string) {
-                        return cookieStore.get(name)?.value;
-                    },
+                    get(name: string) { return cookieStore.get(name)?.value; },
                 },
             }
         );
 
-        // 1. Get User Session
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        // 2. Get User Organization
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
             .from("profiles")
             .select("organization_id")
             .eq("user_id", user.id)
             .single();
 
-        if (profileError || !profile) {
-            return NextResponse.json({ error: "Profile/Organization not found" }, { status: 404 });
-        }
+        if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
         const orgId = profile.organization_id;
 
+        // Check if Twilio config exists
+        const { data: twilioConfig } = await supabase
+            .from('twilio_configs')
+            .select('id')
+            .eq('organization_id', orgId)
+            .eq('is_active', true)
+            .single();
+
+        if (!twilioConfig) {
+            return NextResponse.json({ error: 'Please configure Twilio settings in Integrations before sending bulk SMS.' }, { status: 400 });
+        }
+
         // Resolve Contacts
-        let contacts: { id: string, email: string, first_name: string, last_name: string, organization_id: string }[] = [];
+        let contacts: { id: string, phone: string, first_name: string, last_name: string, organization_id: string }[] = [];
 
         if (isSelectAllMatching) {
             let query = supabase
                 .from('contacts')
-                .select('id, email, first_name, last_name, organization_id')
+                .select('id, phone, first_name, last_name, organization_id')
                 .eq('organization_id', orgId);
+                
             if (filters?.search) {
-                query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
+                query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`);
             }
             if (filters?.status && filters.status !== "all") {
                 query = query.eq('status', filters.status);
@@ -71,7 +75,7 @@ export async function POST(request: Request) {
             }
             const { data, error } = await supabase
                 .from('contacts')
-                .select('id, email, first_name, last_name, organization_id')
+                .select('id, phone, first_name, last_name, organization_id')
                 .in('id', contactIds)
                 .eq('organization_id', orgId);
 
@@ -79,15 +83,14 @@ export async function POST(request: Request) {
             contacts = data || [];
         }
 
-        contacts = contacts.filter(c => !!c.email);
+        contacts = contacts.filter(c => !!c.phone);
 
         if (contacts.length === 0) {
-            return NextResponse.json({ error: 'No selected contacts have valid email addresses.' }, { status: 400 });
+            return NextResponse.json({ error: 'No selected contacts have valid phone numbers.' }, { status: 400 });
         }
 
         const queuePayloads = contacts.map(contact => {
-            let finalSubject = subject;
-            let finalBody = body;
+            let finalMessage = message;
             
             const variables: Record<string, string> = {
                 first_name: contact.first_name || 'there',
@@ -96,33 +99,29 @@ export async function POST(request: Request) {
 
             Object.entries(variables).forEach(([key, value]) => {
                 const placeholder = new RegExp(`{{${key}}}`, 'g');
-                finalSubject = finalSubject.replace(placeholder, value);
-                finalBody = finalBody.replace(placeholder, value);
+                finalMessage = finalMessage.replace(placeholder, value);
             });
 
             return {
                 organization_id: orgId,
-                to_email: contact.email,
-                subject: finalSubject,
-                body_html: finalBody,
+                to_phone: contact.phone,
+                message: finalMessage,
                 contact_id: contact.id,
                 status: 'pending'
             };
         });
 
         if (queuePayloads.length > 0) {
-            const { error: insertError } = await supabase.from('email_queue').insert(queuePayloads);
+            const { error: insertError } = await supabase.from('sms_queue').insert(queuePayloads);
             if (insertError) {
-                console.error("Queue insert error:", insertError);
+                console.error("SMS Queue insert error:", insertError);
                 throw insertError;
             }
         }
 
-        const queuedCount = queuePayloads.length;
-
-        return NextResponse.json({ success: true, queuedCount });
+        return NextResponse.json({ success: true, queuedCount: queuePayloads.length });
     } catch (error) {
-        console.error('Bulk email error:', error);
+        console.error('Bulk SMS error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
