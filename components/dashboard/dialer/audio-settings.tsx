@@ -29,11 +29,14 @@ export function AudioDeviceSettings() {
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
+        let activeStream: MediaStream | null = null;
+
         // Enumerate devices helper
         const loadDevices = async () => {
             try {
                 // Requesting permission is often required first to see device labels
-                await navigator.mediaDevices.getUserMedia({ audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                activeStream = stream;
                 setPermissionGranted(true);
 
                 const devices = await navigator.mediaDevices.enumerateDevices();
@@ -43,12 +46,13 @@ export function AudioDeviceSettings() {
                 setMicrophones(mics);
                 setSpeakers(spkrs);
 
-                // Auto-select first if none selected
-                if (!selectedMicrophoneId && mics.length > 0) {
-                    setSelectedMicrophoneId(mics[0].deviceId);
+                // Auto-select first if none selected without causing dependency re-runs
+                const store = useDialerStore.getState();
+                if (!store.selectedMicrophoneId && mics.length > 0) {
+                    store.setSelectedMicrophoneId(mics[0].deviceId);
                 }
-                if (!selectedSpeakerId && spkrs.length > 0) {
-                    setSelectedSpeakerId(spkrs[0].deviceId);
+                if (!store.selectedSpeakerId && spkrs.length > 0) {
+                    store.setSelectedSpeakerId(spkrs[0].deviceId);
                 }
             } catch (err) {
                 console.warn("Audio device access denied or unavailable", err);
@@ -59,11 +63,18 @@ export function AudioDeviceSettings() {
         loadDevices();
 
         // Listen for device changes (plugging in a headset, etc)
-        navigator.mediaDevices.addEventListener("devicechange", loadDevices);
-        return () => {
-            navigator.mediaDevices.removeEventListener("devicechange", loadDevices);
+        const handleDeviceChange = () => {
+            loadDevices();
         };
-    }, [selectedMicrophoneId, selectedSpeakerId, setSelectedMicrophoneId, setSelectedSpeakerId]);
+
+        navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+        return () => {
+            navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [setSelectedMicrophoneId, setSelectedSpeakerId]);
 
     const playTestSound = async () => {
         if (!audioRef.current) return;

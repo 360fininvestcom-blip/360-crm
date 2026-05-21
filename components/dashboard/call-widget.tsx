@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { useCreateCallLog } from "@/hooks/use-calls";
 import { useUpdateContact } from "@/hooks/use-contacts";
-import { SipService } from "@/lib/services/sip-service";
+
 
 // Sub-components
 import { DialerPad } from "./dialer/dialer-pad";
@@ -110,6 +110,9 @@ export function CallWidget() {
             return;
         }
 
+        // Fetch the queue dynamically from the store's current state to avoid dependency re-runs
+        const { autoDialerQueue } = useDialerStore.getState();
+
         // Check for pending items in queue
         const pendingItems = autoDialerQueue.filter(q => !q.lastStatus);
         if (pendingItems.length === 0) {
@@ -136,7 +139,9 @@ export function CallWidget() {
                 // Trigger the call
                 setCurrentNumber(nextItem.number);
                 startCall();
-                SipService.getInstance().call(nextItem.number);
+                import("@/lib/services/sip-service").then(({ SipService }) => {
+                    SipService.getInstance().call(nextItem.number);
+                });
             }
         }, 3000); // 3 second delay between calls to let the agent breathe
 
@@ -147,7 +152,7 @@ export function CallWidget() {
             }
             setAutoDialCountdown(null);
         };
-    }, [autoDialerActive, isAutoDialerPaused, isInCall, autoDialerQueue, nextAutoDialNumber, setCurrentNumber, startCall, stopAutoDialer]);
+    }, [autoDialerActive, isAutoDialerPaused, isInCall, nextAutoDialNumber, setCurrentNumber, startCall, stopAutoDialer]);
 
 
     const [isMuted, setIsMuted] = useState(false);
@@ -158,34 +163,26 @@ export function CallWidget() {
     const [searchQuery, setSearchQuery] = useState("");
     const [autoDialCountdown, setAutoDialCountdown] = useState<number | null>(null);
     const [sipStatus, setSipStatus] = useState<"connecting" | "connected" | "disconnected" | "error">("disconnected");
-    const ringtoneRef = useRef<HTMLAudioElement | null>(null);
     const prevCallStatusRef = useRef(callStatus);
 
     const debouncedSearch = useDebounce(searchQuery, 300);
     const { data: searchResults } = useContactsPaginated({ search: debouncedSearch, limit: 5 });
 
     useEffect(() => {
-        const interval = setInterval(() => {
+        let isMounted = true;
+        const interval = setInterval(async () => {
+            const { SipService } = await import("@/lib/services/sip-service");
+            if (!isMounted) return;
             const sip = SipService.getInstance();
             setSipStatus(sip.isRegistered() ? "connected" : sip.isConnected() ? "connecting" : "disconnected");
         }, 2000);
-        return () => clearInterval(interval);
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
     }, []);
 
-    // Ringtone effect: play when ringing (after connection), stop when answered
-    useEffect(() => {
-        if (!ringtoneRef.current) return;
-
-        if (callStatus === "ringing") {
-            // Start playing ringtone only when call is ringing (not connecting)
-            ringtoneRef.current.currentTime = 0;
-            ringtoneRef.current.play().catch(err => console.error("Failed to play ringtone:", err));
-        } else {
-            // Stop ringtone when call is answered (active) or ended
-            ringtoneRef.current.pause();
-            ringtoneRef.current.currentTime = 0;
-        }
-    }, [callStatus]);
+    // Outbound ringing is handled natively via WebRTC early media.
 
     // Save call to history when call ends
     useEffect(() => {
@@ -200,11 +197,12 @@ export function CallWidget() {
     const { trigger: createCallLog } = useCreateCallLog();
     const { trigger: updateContact } = useUpdateContact();
 
-    const handleCall = useCallback((numberOverride?: string) => {
+    const handleCall = useCallback(async (numberOverride?: string) => {
         const target = numberOverride || currentNumber;
         if (target) {
             startCall();
             if (target !== currentNumber) setCurrentNumber(target);
+            const { SipService } = await import("@/lib/services/sip-service");
             SipService.getInstance().call(target, selectedSipAccountId || undefined);
         }
     }, [currentNumber, startCall, setCurrentNumber, selectedSipAccountId]);
@@ -248,8 +246,9 @@ export function CallWidget() {
         }
     }, [currentNumber, contact, profile, callDuration, callStartedAt, autoDialerActive, updateContact, createCallLog, updateQueueStatus]);
 
-    const handleHangup = useCallback(() => {
+    const handleHangup = useCallback(async () => {
         const id = selectedSipAccountId || undefined;
+        const { SipService } = await import("@/lib/services/sip-service");
         SipService.getInstance().hangup(id);
 
         // persistCallLog is now handled by the useEffect that watches for 'ended' status
@@ -407,12 +406,26 @@ export function CallWidget() {
                                         onMuteToggle={() => {
                                             const n = !isMuted;
                                             setIsMuted(n);
-                                            SipService.getInstance().mute(n);
+                                            import("@/lib/services/sip-service").then(({ SipService }) => {
+                                                SipService.getInstance().mute(n);
+                                            });
                                         }}
                                         isOnHold={isOnHold}
-                                        onHoldToggle={() => setIsOnHold(!isOnHold)}
+                                        onHoldToggle={() => {
+                                            const n = !isOnHold;
+                                            setIsOnHold(n);
+                                            import("@/lib/services/sip-service").then(({ SipService }) => {
+                                                SipService.getInstance().hold(n, selectedSipAccountId || undefined);
+                                            });
+                                        }}
                                         isSpeakerOn={isSpeakerOn}
-                                        onSpeakerToggle={() => setIsSpeakerOn(!isSpeakerOn)}
+                                        onSpeakerToggle={() => {
+                                            const n = !isSpeakerOn;
+                                            setIsSpeakerOn(n);
+                                            import("@/lib/services/sip-service").then(({ SipService }) => {
+                                                SipService.getInstance().toggleSpeaker(n);
+                                            });
+                                        }}
                                         showKeypad={showKeypad}
                                         onKeypadToggle={() => setShowKeypad(!showKeypad)}
                                         onHangup={() => handleHangup()}
@@ -434,7 +447,9 @@ export function CallWidget() {
                                                 value={selectedSipAccountId || ""}
                                                 onValueChange={(val) => {
                                                     setSelectedSipAccountId(val);
-                                                    SipService.getInstance().activeUAId = val;
+                                                    import("@/lib/services/sip-service").then(({ SipService }) => {
+                                                        SipService.getInstance().activeUAId = val;
+                                                    });
                                                 }}
                                             >
                                                 <SelectTrigger className="w-full h-11 bg-muted/20 border-white/5 rounded-xl">
@@ -503,10 +518,6 @@ export function CallWidget() {
                 </motion.div>
             </AnimatePresence>
 
-            {/* Hidden audio element for ringtone */}
-            <audio ref={ringtoneRef} loop preload="auto">
-                <source src="/ringtone.wav" type="audio/wav" />
-            </audio>
         </>
     );
 }

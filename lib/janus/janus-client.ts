@@ -49,6 +49,8 @@ export class JanusClient {
                 this.ws.onclose = () => {
                     console.warn("[JanusClient] WebSocket closed. Stopping keepalive.");
                     this.stopKeepalive();
+                    const handler = this.eventHandlers.get("close");
+                    if (handler) handler({ janus: "close", transaction: "" });
                 };
                 this.ws.onmessage = (msg) => {
                     try {

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, PhoneOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { useDialerStore } from "@/lib/stores";
 export function IncomingCallModal() {
     const { incomingCall, answerIncomingCall, declineIncomingCall } = useDialerStore();
     const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         if (incomingCall && ringtoneRef.current) {
@@ -19,7 +20,8 @@ export function IncomingCallModal() {
     }, [incomingCall]);
 
     const handleAnswer = async () => {
-        if (!incomingCall) return;
+        if (!incomingCall || isProcessing) return;
+        setIsProcessing(true);
         try {
             // First stop the ringtone
             if (ringtoneRef.current) {
@@ -36,10 +38,14 @@ export function IncomingCallModal() {
         } catch (error) {
             console.error("Failed to answer incoming call:", error);
             declineIncomingCall(); // clean up state
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const handleDecline = async () => {
+        if (isProcessing) return;
+        setIsProcessing(true);
         try {
             const { SipService } = await import("@/lib/services/sip-service");
             await SipService.getInstance().decline();
@@ -47,6 +53,7 @@ export function IncomingCallModal() {
             console.error("Failed to decline call cleanly:", error);
         } finally {
             declineIncomingCall(); // Clean up state regardless
+            setIsProcessing(false);
         }
     };
 
@@ -77,6 +84,7 @@ export function IncomingCallModal() {
                                     size="lg"
                                     className="rounded-full w-14 h-14 bg-red-500 hover:bg-red-600 p-0 shadow-lg shadow-red-500/20"
                                     onClick={handleDecline}
+                                    disabled={isProcessing}
                                 >
                                     <PhoneOff className="h-6 w-6 text-white" />
                                 </Button>
@@ -84,6 +92,7 @@ export function IncomingCallModal() {
                                     size="lg"
                                     className="rounded-full w-14 h-14 bg-green-500 hover:bg-green-600 p-0 shadow-lg shadow-green-500/20"
                                     onClick={handleAnswer}
+                                    disabled={isProcessing}
                                 >
                                     <Phone className="h-6 w-6 text-white fill-white" />
                                 </Button>

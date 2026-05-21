@@ -39,7 +39,6 @@ export const viewport = {
   userScalable: false,
 };
 
-import { PageTransition } from "@/components/providers/page-transition";
 
 export default function RootLayout({
   children,

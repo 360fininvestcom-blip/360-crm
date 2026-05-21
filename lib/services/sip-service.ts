@@ -114,6 +114,7 @@ export class SipService {
             try {
                 console.log(`[SIP] Connecting via Janus Bridge for ${id}: ${bridgeUrl}`);
                 const { JanusUA: JanusUAImpl } = await import("@/lib/janus/janus-ua");
+                _JanusUA = JanusUAImpl;
                 const janusUa = new JanusUAImpl({
                     uri: config.uri,
                     password: config.password,
@@ -335,7 +336,7 @@ export class SipService {
 
     public async answer(jsepOffer?: RTCSessionDescriptionInit | undefined, accountId?: string) {
         const id = accountId || this._activeUAId;
-        const session = id ? this.sessions.get(id) : null;
+        const ua = id ? this.uas.get(id) : null;
 
         const { selectedMicrophoneId, selectedSpeakerId } = useDialerStore.getState();
         const remoteAudio = document.getElementById("sip-remote-audio") as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> };
@@ -344,6 +345,14 @@ export class SipService {
             remoteAudio.setSinkId(selectedSpeakerId).catch(console.error);
         }
 
+        if (_JanusUA && ua instanceof _JanusUA) {
+            if (jsepOffer) {
+                await ua.answer(jsepOffer, selectedMicrophoneId || undefined);
+            }
+            return;
+        }
+
+        const session = id ? this.sessions.get(id) : null;
         if (session && 'answer' in session && typeof session.answer === 'function' && jsepOffer) {
             await (session as any).answer(jsepOffer, selectedMicrophoneId || undefined);
         } else if (session) {
@@ -355,6 +364,13 @@ export class SipService {
 
     public async decline(accountId?: string) {
         const id = accountId || this._activeUAId;
+        const ua = id ? this.uas.get(id) : null;
+
+        if (_JanusUA && ua instanceof _JanusUA) {
+            await ua.decline();
+            return;
+        }
+
         const session = id ? this.sessions.get(id) : null;
         if (session && 'decline' in session) {
             await (session as any).decline();
@@ -365,6 +381,7 @@ export class SipService {
 
     public hangup(accountId?: string) {
         const id = accountId || this._activeUAId;
+        const ua = id ? this.uas.get(id) : null;
 
         if (typeof document !== "undefined") {
             const remoteAudio = document.getElementById("sip-remote-audio") as HTMLAudioElement;
@@ -374,6 +391,14 @@ export class SipService {
             }
         }
         this._remoteStream = null;
+
+        if (_JanusUA && ua instanceof _JanusUA) {
+            ua.hangup().catch(console.error);
+            this._simulationTimeouts.forEach(id => clearTimeout(id));
+            this._simulationTimeouts = [];
+            useDialerStore.getState().endCall();
+            return;
+        }
 
         const session = id ? this.sessions.get(id) : null;
         if (session) {
@@ -401,10 +426,59 @@ export class SipService {
 
     public mute(isMuted: boolean, accountId?: string) {
         const id = accountId || this._activeUAId;
+        const ua = id ? this.uas.get(id) : null;
+
+        if (_JanusUA && ua instanceof _JanusUA) {
+            ua.mute(isMuted);
+            return;
+        }
+
         const session = id ? this.sessions.get(id) : null;
         if (session) {
             if (isMuted) session.mute();
             else session.unmute();
+        }
+    }
+
+    public hold(isOnHold: boolean, accountId?: string) {
+        const id = accountId || this._activeUAId;
+        const ua = id ? this.uas.get(id) : null;
+
+        console.log(`[SIP] Hold requested: ${isOnHold} for account ${id}`);
+
+        if (_JanusUA && ua instanceof _JanusUA) {
+            ua.mute(isOnHold);
+
+            if (typeof document !== "undefined") {
+                const remoteAudio = document.getElementById("sip-remote-audio") as HTMLAudioElement;
+                if (remoteAudio) {
+                    if (isOnHold) {
+                        remoteAudio.pause();
+                    } else {
+                        remoteAudio.play().catch(e => console.warn("[SIP] Remote audio play after unhold failed:", e));
+                    }
+                }
+            }
+            return;
+        }
+
+        const session = id ? this.sessions.get(id) : null;
+        if (session) {
+            if (isOnHold) {
+                if (typeof session.hold === 'function') session.hold();
+            } else {
+                if (typeof session.unhold === 'function') session.unhold();
+            }
+        }
+    }
+
+    public toggleSpeaker(isOn: boolean) {
+        console.log(`[SIP] Toggle speaker output: ${isOn ? "ON" : "OFF"}`);
+        if (typeof document !== "undefined") {
+            const remoteAudio = document.getElementById("sip-remote-audio") as HTMLAudioElement;
+            if (remoteAudio) {
+                remoteAudio.muted = !isOn;
+            }
         }
     }
 
@@ -589,11 +663,13 @@ export class SipService {
         const store = useDialerStore.getState();
         store.startCall();
         const t1 = setTimeout(() => {
-            if (store.callStatus === 'ended') return;
-            store.setCallStatus("ringing");
+            const currentStore = useDialerStore.getState();
+            if (currentStore.callStatus === 'ended') return;
+            currentStore.setCallStatus("ringing");
             const t2 = setTimeout(() => {
-                if (store.callStatus === 'ended') return;
-                store.setCallStatus("active");
+                const innerStore = useDialerStore.getState();
+                if (innerStore.callStatus === 'ended') return;
+                innerStore.setCallStatus("active");
             }, 2000);
             this._simulationTimeouts.push(t2 as unknown as number);
         }, 1000);

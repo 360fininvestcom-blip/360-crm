@@ -92,9 +92,9 @@ export default function CallsPage() {
     const handleCallContact = async (phone: string) => {
         setCurrentNumber(phone);
         openDialer();
+        startCall();
         const { SipService } = await import("@/lib/services/sip-service");
         SipService.getInstance().call(phone);
-        startCall();
     };
 
     // Calculate stats from real data

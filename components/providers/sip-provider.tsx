@@ -151,6 +151,9 @@ export function SipProvider({ children }: { children: React.ReactNode }) {
 
         return () => {
             clearTimeout(timer);
+            import("@/lib/services/sip-service").then(({ SipService }) => {
+                SipService.getInstance().disconnect();
+            }).catch(console.error);
         };
     }, []);
 

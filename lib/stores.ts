@@ -181,6 +181,11 @@ export const useDialerStore = create(
         }),
         {
             name: "nanosol-dialer-storage",
+            partialize: (state) => ({
+                selectedSipAccountId: state.selectedSipAccountId,
+                selectedMicrophoneId: state.selectedMicrophoneId,
+                selectedSpeakerId: state.selectedSpeakerId,
+            }) as DialerState,
         }
     )
 );

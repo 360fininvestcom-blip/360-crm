@@ -17,6 +17,10 @@ export class JanusUA {
     private options: JanusUAOptions;
     private handlers: Map<string, Array<(...args: unknown[]) => void>> = new Map();
     private statsInterval: ReturnType<typeof setInterval> | null = null;
+    private isReconnecting = false;
+    private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    private maxReconnectAttempts = 5;
+    private reconnectAttempts = 0;
 
     constructor(options: JanusUAOptions) {
         this.options = options;
@@ -68,6 +72,13 @@ export class JanusUA {
                     .catch(e => console.warn("[JanusUA] ❌ Failed to add ICE candidate:", e));
             }
         });
+
+        // Handle WebSocket close event
+        this.client.onEvent("close", () => {
+            console.log("[JanusUA] 🔌 WebSocket connection closed. Triggering reconnection...");
+            this.emit("unregistered", {});
+            this.attemptReconnection();
+        });
     }
 
     public async register() {
@@ -99,6 +110,11 @@ export class JanusUA {
     }
 
     public async call(targetUri: string, audioDeviceId?: string) {
+        // Guard: ensure Janus session + plugin handle are ready before calling
+        if (!this.client.activeHandleId) {
+            throw new Error("SIP not registered yet. Please wait for registration to complete before placing a call.");
+        }
+
         // Ensure target is in full SIP URI format: sip:number@domain
         let sipUri = targetUri;
         if (!sipUri.startsWith("sip:")) {
@@ -385,6 +401,46 @@ export class JanusUA {
         };
     }
 
+    public mute(isMuted: boolean) {
+        if (this.localStream) {
+            this.localStream.getAudioTracks().forEach(track => {
+                track.enabled = !isMuted;
+            });
+            console.log(`[JanusUA] Local audio track ${isMuted ? "disabled (muted)" : "enabled (unmuted)"}`);
+        }
+    }
+
+    private attemptReconnection() {
+        if (this.isReconnecting) return;
+        this.isReconnecting = true;
+        this.reconnectAttempts = 0;
+        this.reconnect();
+    }
+
+    private async reconnect() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.error("[JanusUA] ❌ Max reconnect attempts reached. Reconnection aborted.");
+            this.isReconnecting = false;
+            return;
+        }
+
+        this.reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 15000);
+        console.log(`[JanusUA] 🔄 Reconnecting attempt #${this.reconnectAttempts} in ${delay}ms...`);
+
+        this.reconnectTimeout = setTimeout(async () => {
+            try {
+                await this.register();
+                console.log("[JanusUA] ✅ Reconnected and registered successfully!");
+                this.isReconnecting = false;
+                this.reconnectAttempts = 0;
+            } catch (err) {
+                console.warn("[JanusUA] ⚠️ Reconnection attempt failed:", err);
+                this.reconnect();
+            }
+        }, delay);
+    }
+
     private cleanup() {
         if (this.statsInterval) {
             clearInterval(this.statsInterval);
@@ -406,6 +462,11 @@ export class JanusUA {
     }
 
     public stop() {
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+        this.isReconnecting = false;
         this.cleanup();
         this.client.disconnect();
     }
