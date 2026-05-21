@@ -1,0 +1,24 @@
+name: Sync to Account B
+
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - '*'
+
+jobs:
+  git-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Account A
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Account B
+        env:
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          git config --local --unset-all http.https://github.com/.extraheader || true
+          git push --prune --force https://x-access-token:${SYNC_TOKEN}@github.com/360fininvestcom-blip/360CRM.git +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*
