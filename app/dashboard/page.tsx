@@ -87,28 +87,28 @@ export default function DashboardPage() {
 
             {/* Quick Actions */}
             <motion.div variants={item}>
-                <Card>
+                <Card className="glass-panel card-hover-effect border-primary/10">
                     <CardHeader>
-                        <CardTitle>Quick Actions</CardTitle>
+                        <CardTitle className="text-xl font-semibold tracking-tight">Quick Actions</CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-wrap gap-3">
-                        <Button onClick={() => setContactDialogOpen(true)}>
+                        <Button className="btn-hover-effect shadow-md" onClick={() => setContactDialogOpen(true)}>
                             <Users className="h-4 w-4 mr-2" />
                             Add Contact
                         </Button>
-                        <Button variant="outline" onClick={() => setDealDialogOpen(true)}>
+                        <Button variant="outline" className="btn-hover-effect bg-background/50 backdrop-blur-sm hover:bg-accent" onClick={() => setDealDialogOpen(true)}>
                             <Briefcase className="h-4 w-4 mr-2" />
                             Create Deal
                         </Button>
-                        <Button variant="outline" onClick={() => openDialer()}>
+                        <Button variant="outline" className="btn-hover-effect bg-background/50 backdrop-blur-sm hover:bg-accent" onClick={() => openDialer()}>
                             <Phone className="h-4 w-4 mr-2" />
                             Make Call
                         </Button>
-                        <Button variant="outline" onClick={() => setEmailDialogOpen(true)}>
+                        <Button variant="outline" className="btn-hover-effect bg-background/50 backdrop-blur-sm hover:bg-accent" onClick={() => setEmailDialogOpen(true)}>
                             <Mail className="h-4 w-4 mr-2" />
                             Send Email
                         </Button>
-                        <Button variant="outline" onClick={() => setEventDialogOpen(true)}>
+                        <Button variant="outline" className="btn-hover-effect bg-background/50 backdrop-blur-sm hover:bg-accent" onClick={() => setEventDialogOpen(true)}>
                             <Calendar className="h-4 w-4 mr-2" />
                             Schedule Meeting
                         </Button>

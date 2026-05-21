@@ -15,6 +15,7 @@ import { CopilotProvider } from "@/components/copilot/copilot-provider";
 import { OrgBrandingProvider } from "@/components/providers/org-branding-provider";
 import { CallWidget } from "@/components/dashboard/call-widget";
 import { SipProvider } from "@/components/providers/sip-provider";
+import { PageTransition } from "@/components/providers/page-transition";
 
 export default function DashboardLayout({
     children,
@@ -46,7 +47,9 @@ export default function DashboardLayout({
                                 <main className="p-4 md:p-6 min-h-[calc(100vh-64px)]">
                                     <ErrorBoundary name="Main Content">
                                         <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground animate-pulse">Loading dashboard module...</div>}>
-                                            {children}
+                                            <PageTransition>
+                                                {children}
+                                            </PageTransition>
                                         </Suspense>
                                     </ErrorBoundary>
                                 </main>

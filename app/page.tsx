@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LandingNav } from "@/components/landing/nav";
 import { ClientMotion } from "@/components/landing/client-motion";
+import { MouseGlow } from "@/components/landing/mouse-glow";
 
 const features = [
   {
@@ -74,7 +75,8 @@ const testimonials = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background" suppressHydrationWarning>
+    <div className="min-h-screen bg-background relative overflow-hidden" suppressHydrationWarning>
+      <MouseGlow />
       <LandingNav />
 
       {/* Hero Section */}
@@ -133,17 +135,17 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.2 }}
-            className="mt-16"
+            className="mt-16 max-w-5xl mx-auto"
           >
-            <div className="relative rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-1">
-              <div className="rounded-lg bg-card border shadow-2xl overflow-hidden">
+            <div className="relative rounded-xl bg-gradient-to-br from-primary/30 via-primary/10 to-transparent p-[2px]">
+              <div className="rounded-lg bg-card border border-border/50 shadow-2xl overflow-hidden glass-panel">
                 <Image
-                  src="/dashboard-preview.png"
+                  src="/elite-dashboard-v4.png"
                   alt="NanoSol CRM Dashboard Preview"
                   width={1200}
                   height={675}
                   priority
-                  className="w-full h-auto object-cover"
+                  className="w-full h-auto object-cover opacity-90 hover:opacity-100 transition-opacity"
                 />
               </div>
             </div>
@@ -179,9 +181,9 @@ export default function LandingPage() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
               >
-                <Card className="h-full hover:shadow-lg transition-shadow">
+                <Card className="h-full hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 glass-panel border-primary/10 hover:shadow-primary/20 hover:shadow-xl">
                   <CardContent className="p-6">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mb-4 shadow-inner">
                       <feature.icon className="h-6 w-6 text-primary" />
                     </div>
                     <h3 className="text-lg font-semibold mb-2">
