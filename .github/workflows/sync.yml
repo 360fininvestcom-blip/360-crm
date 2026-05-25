@@ -9,6 +9,7 @@ on:
 
 jobs:
   git-sync:
+    if: github.repository == 'monologicalco-a11y/grantcrm'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Account A
