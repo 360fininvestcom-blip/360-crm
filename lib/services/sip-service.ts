@@ -110,7 +110,13 @@ export class SipService {
         const engine = config.engine || "janus";
         
         if (engine === "janus") {
-            const bridgeUrl = config.janus_url || "wss://sip.nanocall.space:8989";
+            let bridgeUrl = config.janus_url || "wss://sip.nanocall.space:8989";
+            if (typeof window !== "undefined" && window.location.protocol === "http:") {
+                if (bridgeUrl.includes("sip.nanocall.space:8989")) {
+                    console.log("[SIP] Local dev environment detected over HTTP. Rewriting Janus URL to use insecure WebSocket on port 8188.");
+                    bridgeUrl = bridgeUrl.replace("wss://sip.nanocall.space:8989", "ws://sip.nanocall.space:8188");
+                }
+            }
             try {
                 console.log(`[SIP] Connecting via Janus Bridge for ${id}: ${bridgeUrl}`);
                 const { JanusUA: JanusUAImpl } = await import("@/lib/janus/janus-ua");
