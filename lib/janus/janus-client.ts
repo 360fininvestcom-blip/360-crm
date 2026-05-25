@@ -47,7 +47,7 @@ export class JanusClient {
                     resolve();
                 };
                 this.ws.onerror = (err: Event) => {
-                    console.error(`[JanusClient] WebSocket connection error on ${this.url}`);
+                    console.warn(`[JanusClient] WebSocket connection error on ${this.url}`);
                     reject(new Error(`WebSocket connection to ${this.url} failed. Ensure the server is reachable and SSL is valid.`));
                 };
                 this.ws.onclose = () => {

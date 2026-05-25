@@ -1,11 +1,7 @@
-"use client";
-
-import nextDynamic from "next/dynamic";
+import { SignupClientWrapper } from "./signup-client-wrapper";
 
 export const dynamic = "force-dynamic";
 
-const SignupContent = nextDynamic(() => import("./signup-content"), { ssr: false });
-
 export default function SignupPage() {
-    return <SignupContent />;
+    return <SignupClientWrapper />;
 }

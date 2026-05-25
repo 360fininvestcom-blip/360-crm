@@ -137,7 +137,7 @@ export class SipService {
                 if (!this._activeUAId) this._activeUAId = id;
                 return;
             } catch (err) {
-                console.error(`[SIP] Janus connection failed for ${id}:`, err);
+                console.warn(`[SIP] Janus connection failed for ${id}:`, err);
                 toast.error("Failed to connect to Janus Bridge");
                 return;
             }

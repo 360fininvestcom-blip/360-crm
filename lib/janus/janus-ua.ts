@@ -419,7 +419,7 @@ export class JanusUA {
 
     private async reconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error("[JanusUA] ❌ Max reconnect attempts reached. Reconnection aborted.");
+            console.warn("[JanusUA] ❌ Max reconnect attempts reached. Reconnection aborted.");
             this.isReconnecting = false;
             return;
         }
