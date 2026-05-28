@@ -146,6 +146,14 @@ export class JanusUA {
             : true;
 
         this.localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        
+        if (!this.pc) {
+            console.warn("[JanusUA] 🛑 Call was cancelled before getUserMedia resolved.");
+            this.localStream.getTracks().forEach(t => t.stop());
+            this.localStream = null;
+            return;
+        }
+
         this.localStream.getTracks().forEach(track => this.pc?.addTrack(track, this.localStream!));
 
         let signalingSent = false;
@@ -228,6 +236,14 @@ export class JanusUA {
             : true;
 
         this.localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        
+        if (!this.pc) {
+            console.warn("[JanusUA] 🛑 Answer was cancelled before getUserMedia resolved.");
+            this.localStream.getTracks().forEach(t => t.stop());
+            this.localStream = null;
+            return;
+        }
+
         this.localStream.getTracks().forEach(track => this.pc?.addTrack(track, this.localStream!));
 
         let signalingSent = false;
