@@ -18,8 +18,8 @@ const dialpadLetters: Record<string, string> = {
 
 interface SearchResult {
     id: string;
-    first_name: string;
-    last_name?: string | null;
+    firstName: string;
+    lastName?: string | null;
     phone?: string | null;
     company?: string | null;
 }
@@ -80,14 +80,14 @@ export const DialerPad = React.memo(({
                         {searchResults.map((c) => (
                             <button
                                 key={c.id}
-                                onClick={() => onQuickDial(c.phone || "", `${c.first_name} ${c.last_name || ""}`.trim())}
+                                onClick={() => onQuickDial(c.phone || "", `${c.firstName} ${c.lastName || ""}`.trim())}
                                 className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-primary/5 transition-colors text-left"
                             >
                                 <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
                                     <User className="h-3 w-3 text-primary" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{`${c.first_name} ${c.last_name || ""}`.trim()}</p>
+                                    <p className="text-sm font-medium truncate">{`${c.firstName} ${c.lastName || ""}`.trim()}</p>
                                     <p className="text-xs text-muted-foreground">{c.phone}</p>
                                 </div>
                             </button>

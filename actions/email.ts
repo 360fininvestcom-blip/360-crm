@@ -9,6 +9,9 @@ import { Prisma } from "@prisma/client";
 export async function getEmailTemplates(): Promise<EmailTemplate[]> {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const templates = await prisma.$queryRaw`
         SELECT * FROM email_templates
@@ -20,6 +23,9 @@ export async function getEmailTemplates(): Promise<EmailTemplate[]> {
 export async function getEmailSequences(): Promise<EmailSequence[]> {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const sequences = await prisma.$queryRaw`
         SELECT * FROM email_sequences
@@ -31,6 +37,9 @@ export async function getEmailSequences(): Promise<EmailSequence[]> {
 export async function getSMTPConfigs(): Promise<SMTPConfig[]> {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const configs = await prisma.$queryRaw`
         SELECT * FROM smtp_configs
@@ -39,143 +48,86 @@ export async function getSMTPConfigs(): Promise<SMTPConfig[]> {
     return configs as SMTPConfig[];
 }
 
-export async function createEmailSequence(arg: Omit<EmailSequence, "id" | "created_at" | "updated_at">) {
+export async function createEmailSequence(arg: Omit<EmailSequence, "id" | "createdAt" | "updatedAt">) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
 
-    const columns = [];
-    const values = [];
-
-    for (const [key, value] of Object.entries(arg)) {
-        if (value !== undefined) {
-            columns.push(Prisma.raw(key));
-            if (key === 'organization_id') {
-                values.push(Prisma.sql`CAST(${value} AS UUID)`);
-            } else if (key === 'steps') {
-                values.push(Prisma.sql`${value}::jsonb`);
-            } else {
-                values.push(value);
-            }
+    return prisma.emailSequence.create({
+        data: {
+            ...arg,
+            steps: arg.steps as Prisma.InputJsonValue,
         }
-    }
-
-    const result = await prisma.$queryRaw`
-        INSERT INTO email_sequences (${Prisma.join(columns, ', ')})
-        VALUES (${Prisma.join(values, ', ')})
-        RETURNING *
-    `;
-    
-    // @ts-ignore
-    return result[0];
+    });
 }
 
 export async function updateEmailSequence(id: string, updates: Partial<EmailSequence>) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
 
-    const setClauses = [];
-    for (const [key, value] of Object.entries(updates)) {
-        if (value !== undefined && key !== 'id') {
-            if (key === 'organization_id') {
-                setClauses.push(Prisma.sql`${Prisma.raw(key)} = CAST(${value} AS UUID)`);
-            } else if (key === 'steps') {
-                setClauses.push(Prisma.sql`${Prisma.raw(key)} = ${value}::jsonb`);
-            } else {
-                setClauses.push(Prisma.sql`${Prisma.raw(key)} = ${value}`);
-            }
+    return prisma.emailSequence.update({
+        where: { id },
+        data: {
+            ...updates,
+            steps: updates.steps ? (updates.steps as Prisma.InputJsonValue) : undefined,
         }
-    }
-    setClauses.push(Prisma.sql`updated_at = CAST(${new Date().toISOString()} AS TIMESTAMPTZ)`);
-
-    const result = await prisma.$queryRaw`
-        UPDATE email_sequences
-        SET ${Prisma.join(setClauses, ', ')}
-        WHERE id = CAST(${id} AS UUID)
-        RETURNING *
-    `;
-    
-    // @ts-ignore
-    return result[0];
+    });
 }
 
 export async function deleteEmailSequence(id: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
 
-    await prisma.$executeRaw`
-        DELETE FROM email_sequences
-        WHERE id = CAST(${id} AS UUID)
-    `;
+    await prisma.emailSequence.delete({
+        where: { id }
+    });
 }
 
-export async function createEmailTemplate(arg: Omit<EmailTemplate, "id" | "created_at" | "updated_at">) {
+export async function createEmailTemplate(arg: Omit<EmailTemplate, "id" | "createdAt" | "updatedAt">) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
 
-    const columns = [];
-    const values = [];
-
-    for (const [key, value] of Object.entries(arg)) {
-        if (value !== undefined) {
-            columns.push(Prisma.raw(key));
-            if (key === 'organization_id') {
-                values.push(Prisma.sql`CAST(${value} AS UUID)`);
-            } else {
-                values.push(value);
-            }
-        }
-    }
-
-    const result = await prisma.$queryRaw`
-        INSERT INTO email_templates (${Prisma.join(columns, ', ')})
-        VALUES (${Prisma.join(values, ', ')})
-        RETURNING *
-    `;
-    
-    // @ts-ignore
-    return result[0];
+    return prisma.emailTemplate.create({
+        data: arg
+    });
 }
 
 export async function updateEmailTemplate(id: string, updates: Partial<EmailTemplate>) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
 
-    const setClauses = [];
-    for (const [key, value] of Object.entries(updates)) {
-        if (value !== undefined && key !== 'id') {
-            if (key === 'organization_id') {
-                setClauses.push(Prisma.sql`${Prisma.raw(key)} = CAST(${value} AS UUID)`);
-            } else {
-                setClauses.push(Prisma.sql`${Prisma.raw(key)} = ${value}`);
-            }
-        }
-    }
-    setClauses.push(Prisma.sql`updated_at = CAST(${new Date().toISOString()} AS TIMESTAMPTZ)`);
-
-    const result = await prisma.$queryRaw`
-        UPDATE email_templates
-        SET ${Prisma.join(setClauses, ', ')}
-        WHERE id = CAST(${id} AS UUID)
-        RETURNING *
-    `;
-    
-    // @ts-ignore
-    return result[0];
+    return prisma.emailTemplate.update({
+        where: { id },
+        data: updates
+    });
 }
 
 export async function deleteEmailTemplate(id: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
 
-    await prisma.$executeRaw`
-        DELETE FROM email_templates
-        WHERE id = CAST(${id} AS UUID)
-    `;
+    await prisma.emailTemplate.delete({
+        where: { id }
+    });
 }
 
 export async function getSequenceEnrollments(sequenceId: string): Promise<SequenceEnrollment[]> {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const enrollments = await prisma.$queryRaw`
         SELECT 
@@ -193,6 +145,9 @@ export async function getSequenceEnrollments(sequenceId: string): Promise<Sequen
 export async function enrollInSequence(arg: { sequence_id: string; contact_ids: string[]; organization_id: string }) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const values = [];
     for (const contact_id of arg.contact_ids) {
@@ -213,6 +168,9 @@ export async function enrollInSequence(arg: { sequence_id: string; contact_ids: 
 export async function updateEnrollment(id: string, updates: Partial<SequenceEnrollment>) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const setClauses = [];
     for (const [key, value] of Object.entries(updates)) {
@@ -242,11 +200,14 @@ export async function updateEnrollment(id: string, updates: Partial<SequenceEnro
 export async function getEmailMetrics() {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const emails = await prisma.$queryRaw`
         SELECT id, opens_count, clicks_count, received_at 
         FROM emails
-        WHERE organization_id = CAST(${session.user.organizationId} AS UUID)
+        WHERE organization_id = CAST(${organizationId} AS UUID)
         AND folder = 'sent'
     `;
     

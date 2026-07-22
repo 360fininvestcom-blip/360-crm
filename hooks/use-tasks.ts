@@ -18,7 +18,7 @@ export function useTasks(filters?: {
         return data.map(item => ({
             ...item,
             // Ensure nested objects are handled correctly if returned as array or null
-            assigned_to: Array.isArray(item.assigned_to) ? item.assigned_to[0] : item.assigned_to,
+            assignedTo: Array.isArray(item.assignedTo) ? item.assignedTo[0] : item.assignedTo,
             contact: Array.isArray(item.contact) ? item.contact[0] : item.contact,
             deal: Array.isArray(item.deal) ? item.deal[0] : item.deal,
         })) as Task[];

@@ -63,12 +63,12 @@ export function TaskCard({ task }: TaskCardProps) {
                     <Badge variant="outline" className={cn("text-[10px] uppercase font-bold", priorityColors[task.priority])}>
                         {task.priority}
                     </Badge>
-                    {task.due_date && (
+                    {task.dueDate && (
                         <div className={cn(
                             "flex items-center text-[10px]",
-                            new Date(task.due_date) < new Date() ? "text-red-500 font-medium" : "text-muted-foreground"
+                            new Date(task.dueDate) < new Date() ? "text-red-500 font-medium" : "text-muted-foreground"
                         )}>
-                            {format(new Date(task.due_date), "MMM d")}
+                            {format(new Date(task.dueDate), "MMM d")}
                         </div>
                     )}
                 </div>
@@ -86,14 +86,14 @@ export function TaskCard({ task }: TaskCardProps) {
                     {task.contact ? (
                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full max-w-[120px] truncate">
                             <User2 className="h-3 w-3" />
-                            <span className="truncate">{task.contact.first_name} {task.contact.last_name}</span>
+                            <span className="truncate">{task.contact.firstName} {task.contact.lastName}</span>
                         </div>
                     ) : <div />}
 
-                    {task.assigned_to && (
+                    {task.assignedTo && (
                         <Avatar className="h-5 w-5 border ring-1 ring-background">
-                            <AvatarImage src={task.assigned_to.avatar_url} />
-                            <AvatarFallback className="text-[8px]">{task.assigned_to.full_name[0]}</AvatarFallback>
+                            <AvatarImage src={task.assignedTo?.avatarUrl || undefined} />
+                            <AvatarFallback className="text-[8px]">{task.assignedTo?.fullName?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
                         </Avatar>
                     )}
                 </div>

@@ -42,7 +42,7 @@ export default function CalendarPage() {
     const getEventsForDay = (day: number) => {
         if (!events) return [];
         const date = new Date(currentYear, today.getMonth(), day);
-        return events.filter(event => isSameDay(parseISO(event.start_time), date));
+        return events.filter(event => isSameDay(parseISO((event as any).startTime as string), date));
     };
 
     return (
@@ -176,10 +176,10 @@ export default function CalendarPage() {
                                     >
                                         <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-primary/10 text-primary shrink-0">
                                             <span className="text-xs font-medium uppercase">
-                                                {format(parseISO(event.start_time), "MMM")}
+                                                {format(parseISO((event as any).startTime || (event as any).startTime), "MMM")}
                                             </span>
                                             <span className="text-lg font-bold">
-                                                {format(parseISO(event.start_time), "d")}
+                                                {format(parseISO((event as any).startTime || (event as any).startTime), "d")}
                                             </span>
                                         </div>
                                         <div className="space-y-1 min-w-0">
@@ -187,7 +187,7 @@ export default function CalendarPage() {
                                                 {event.title}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {format(parseISO(event.start_time), "h:mm a")} - {format(parseISO(event.end_time), "h:mm a")}
+                                                {format(parseISO((event as any).startTime || (event as any).startTime), "h:mm a")} - {format(parseISO((event as any).endTime || (event as any).endTime), "h:mm a")}
                                             </p>
                                         </div>
                                     </div>

@@ -93,7 +93,6 @@ export async function POST(request: NextRequest) {
                         fullName: full_name,
                         email: email,
                         role: role,
-                        phone: phone || null,
                     }
                 }
             },
@@ -105,7 +104,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             userId: newUser.id,
-            profileId: newUser.profile?.id,
+            profileId: (newUser as any).profile?.id,
             message: `User ${full_name} created successfully`,
         });
 

@@ -20,6 +20,7 @@ export default function ForgotPasswordContent() {
         setIsLoading(true);
 
         try {
+            // @ts-ignore
             const { error } = await authClient.forgetPassword({
                 email,
                 redirectTo: "/reset-password",

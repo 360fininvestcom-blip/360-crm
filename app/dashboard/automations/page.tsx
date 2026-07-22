@@ -27,13 +27,13 @@ export default function AutomationPage() {
     const { trigger: createWorkflow } = useCreateWorkflow();
 
     const handleCreate = async () => {
-        if (!profile?.organization_id) {
+        if (!profile?.organizationId) {
             toast.error("Unable to create workflow: Organization not found");
             return;
         }
         try {
             await createWorkflow({
-                organization_id: profile.organization_id,
+                organization_id: profile.organizationId,
                 name: "New Automation",
                 description: "Describe your automation here...",
                 nodes: [],

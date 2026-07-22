@@ -91,18 +91,21 @@ export function ImportDialog({
             skipEmptyLines: true,
             complete: async (results) => {
                 const contactsToCreate = (results.data as Record<string, string>[]).map((row) => ({
-                    organization_id: organizationId,
-                    first_name: row.first_name || "Unknown",
-                    last_name: row.last_name || null,
+                    organizationId: organizationId,
+                    firstName: row.first_name || row.firstName || "Unknown",
+                    lastName: row.last_name || row.lastName || null,
                     email: row.email || null,
                     phone: row.phone || null,
                     company: row.company || null,
-                    job_title: row.job_title || null,
+                    jobTitle: row.job_title || row.jobTitle || null,
                     status: row.status || "new",
-                    owner_id: ownerId, // Assign to the agent importing
-                    lead_score: Number(row.lead_score) || 0,
+                    source: null,
+                    lastCallStatus: null,
+                    lastCallAt: null,
+                    ownerId: ownerId || null, // Assign to the agent importing
+                    leadScore: Number(row.lead_score || row.leadScore) || 0,
                     tags: [],
-                    custom_fields: {},
+                    customFields: {},
                 }));
 
                 if (contactsToCreate.length === 0) {

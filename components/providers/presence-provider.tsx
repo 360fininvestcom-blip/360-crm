@@ -25,9 +25,9 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const [presence, setPresence] = useState<PresenceState>({ users: {} });
 
     useEffect(() => {
-        if (!profile?.organization_id) return;
+        if (!profile?.organizationId) return;
 
-        const channelName = `presence-org-${profile.organization_id}`;
+        const channelName = `presence-org-${profile.organizationId}`;
         const channel = pusherClient.subscribe(channelName) as any;
 
         channel.bind('pusher:subscription_succeeded', (members: any) => {

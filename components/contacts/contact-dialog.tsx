@@ -34,12 +34,12 @@ import { CallHistory } from "@/components/dashboard/dialer/call-history";
 import { useDialerStore } from "@/lib/stores";
 
 interface ContactFormData {
-    first_name: string;
-    last_name: string;
+    firstName: string;
+    lastName: string;
     email: string;
     phone: string;
     company: string;
-    job_title: string;
+    jobTitle: string;
     status: string;
 }
 
@@ -88,21 +88,21 @@ export function ContactDialog({
     } = useForm<ContactFormData>({
         defaultValues: contact
             ? {
-                first_name: contact.first_name,
-                last_name: contact.last_name || "",
+                firstName: contact.firstName,
+                lastName: contact.lastName || "",
                 email: contact.email || "",
                 phone: contact.phone || "",
                 company: contact.company || "",
-                job_title: contact.job_title || "",
+                jobTitle: contact.jobTitle || "",
                 status: contact.status || "new",
             }
             : {
-                first_name: "",
-                last_name: "",
+                firstName: "",
+                lastName: "",
                 email: "",
                 phone: "",
                 company: "",
-                job_title: "",
+                jobTitle: "",
                 status: "new",
             },
     });
@@ -115,22 +115,22 @@ export function ContactDialog({
     useEffect(() => {
         if (contact) {
             reset({
-                first_name: contact.first_name,
-                last_name: contact.last_name || "",
+                firstName: contact.firstName,
+                lastName: contact.lastName || "",
                 email: contact.email || "",
                 phone: contact.phone || "",
                 company: contact.company || "",
-                job_title: contact.job_title || "",
+                jobTitle: contact.jobTitle || "",
                 status: contact.status || "new",
             });
         } else {
             reset({
-                first_name: "",
-                last_name: "",
+                firstName: "",
+                lastName: "",
                 email: "",
                 phone: "",
                 company: "",
-                job_title: "",
+                jobTitle: "",
                 status: "new",
             });
         }
@@ -153,10 +153,14 @@ export function ContactDialog({
                 }
                 await createContact({
                     ...data,
-                    organization_id: organizationId,
-                    owner_id: ownerId, // Automatically assign to the current agent creating the contact
+                    organizationId: organizationId,
+                    ownerId: ownerId || null, // Automatically assign to the current agent creating the contact
+                    source: null,
+                    lastCallStatus: null,
+                    lastCallAt: null,
+                    leadScore: 0,
                     tags: [],
-                    custom_fields: {},
+                    customFields: {},
                 });
                 toast.success("Contact created successfully");
             }
@@ -199,23 +203,23 @@ export function ContactDialog({
                         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="first_name">First Name *</Label>
+                                    <Label htmlFor="firstName">First Name *</Label>
                                     <Input
-                                        id="first_name"
-                                        {...register("first_name", { required: "First name is required" })}
+                                        id="firstName"
+                                        {...register("firstName", { required: "First name is required" })}
                                         placeholder="John"
                                     />
-                                    {errors.first_name && (
+                                    {errors.firstName && (
                                         <p className="text-xs text-destructive">
-                                            {errors.first_name.message}
+                                            {errors.firstName.message}
                                         </p>
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="last_name">Last Name</Label>
+                                    <Label htmlFor="lastName">Last Name</Label>
                                     <Input
-                                        id="last_name"
-                                        {...register("last_name")}
+                                        id="lastName"
+                                        {...register("lastName")}
                                         placeholder="Smith"
                                     />
                                 </div>
@@ -258,10 +262,10 @@ export function ContactDialog({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="job_title">Job Title</Label>
+                                    <Label htmlFor="jobTitle">Job Title</Label>
                                     <Input
-                                        id="job_title"
-                                        {...register("job_title")}
+                                        id="jobTitle"
+                                        {...register("jobTitle")}
                                         placeholder="CEO"
                                     />
                                 </div>

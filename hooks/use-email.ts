@@ -122,7 +122,7 @@ export function useEmailBatchAction() {
 export function useCreateEmailSequence() {
     return useSWRMutation(
         "email-sequences",
-        async (_, { arg }: { arg: Omit<EmailSequence, "id" | "created_at" | "updated_at"> }) => {
+        async (_, { arg }: { arg: Omit<EmailSequence, "id" | "createdAt" | "updatedAt"> }) => {
             return await createEmailSequence(arg);
         },
         {
@@ -159,7 +159,7 @@ export function useDeleteEmailSequence() {
 export function useCreateEmailTemplate() {
     return useSWRMutation(
         "email-templates",
-        async (_, { arg }: { arg: Omit<EmailTemplate, "id" | "created_at" | "updated_at"> }) => {
+        async (_, { arg }: { arg: Omit<EmailTemplate, "id" | "createdAt" | "updatedAt"> }) => {
             return await createEmailTemplate(arg);
         },
         {

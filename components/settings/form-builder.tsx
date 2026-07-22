@@ -39,7 +39,7 @@ export function FormBuilder() {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     const fetchForms = useCallback(async () => {
-        if (!profile?.organization_id) return;
+        if (!profile?.organizationId) return;
         setLoading(true);
         try {
             const data = await getWebForms();
@@ -52,18 +52,18 @@ export function FormBuilder() {
         } finally {
             setLoading(false);
         }
-    }, [profile?.organization_id]);
+    }, [profile?.organizationId]);
 
     useEffect(() => {
         fetchForms();
     }, [fetchForms]);
 
     const handleSave = async () => {
-        if (!editingForm?.name || !profile?.organization_id) return;
+        if (!editingForm?.name || !profile?.organizationId) return;
         setSaving(true);
 
         const payload = {
-            organization_id: profile.organization_id,
+            organizationId: profile.organizationId,
             name: editingForm.name,
             description: editingForm.description || '',
             submit_button_text: editingForm.submit_button_text || 'Submit',

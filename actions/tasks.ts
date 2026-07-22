@@ -55,10 +55,7 @@ export async function createTask(newTask: Partial<Task>) {
     }
     
     // Add defaults
-    if (!newTask.created_by) {
-        columns.push(Prisma.raw('created_by'));
-        values.push(Prisma.sql`CAST(${session.user.id} AS UUID)`);
-    }
+    // Note: Task doesn't have createdBy
 
     const result = await prisma.$queryRaw`
         INSERT INTO tasks (${Prisma.join(columns, ', ')})

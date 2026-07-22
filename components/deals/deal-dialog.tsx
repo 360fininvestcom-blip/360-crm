@@ -44,8 +44,8 @@ interface DealFormData {
     value: number;
     stage: string;
     probability: number;
-    contact_id: string;
-    expected_close_date: string;
+    contactId: string;
+    expectedCloseDate: string;
 }
 
 interface DealDialogProps {
@@ -87,19 +87,19 @@ export function DealDialog({
         defaultValues: deal
             ? {
                 name: deal.name,
-                value: deal.value,
+                value: deal.value as any,
                 stage: deal.stage,
                 probability: deal.probability,
-                contact_id: deal.contact_id || "none",
-                expected_close_date: deal.expected_close_date || "",
+                contactId: deal.contactId || "none",
+                expectedCloseDate: deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toISOString().split('T')[0] : "",
             }
             : {
                 name: "",
                 value: 0,
                 stage: stages[0]?.id || "lead",
                 probability: 10,
-                contact_id: "none",
-                expected_close_date: "",
+                contactId: "none",
+                expectedCloseDate: "",
             },
     });
 
@@ -107,11 +107,11 @@ export function DealDialog({
         if (deal) {
             reset({
                 name: deal.name,
-                value: deal.value,
+                value: deal.value as any,
                 stage: deal.stage,
                 probability: deal.probability,
-                contact_id: deal.contact_id || "none",
-                expected_close_date: deal.expected_close_date || "",
+                contactId: deal.contactId || "none",
+                expectedCloseDate: deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toISOString().split('T')[0] : "",
             });
         } else {
             reset({
@@ -119,8 +119,8 @@ export function DealDialog({
                 value: 0,
                 stage: stages[0]?.id || "lead",
                 probability: 10,
-                contact_id: "none",
-                expected_close_date: "",
+                contactId: "none",
+                expectedCloseDate: "",
             });
         }
     }, [deal, reset, stages]);
@@ -132,7 +132,7 @@ export function DealDialog({
 
     const watchedContactId = useWatch({
         control,
-        name: "contact_id",
+        name: "contactId",
     });
 
     // Derive the display name for the selected contact
@@ -140,7 +140,7 @@ export function DealDialog({
         if (!watchedContactId || watchedContactId === "none") return "No contact";
         const contact = contacts?.find((c) => c.id === watchedContactId);
         if (!contact) return "No contact";
-        return `${contact.first_name} ${contact.last_name || ""}${contact.company ? ` - ${contact.company}` : ""}`;
+        return `${contact.firstName} ${contact.lastName || ""}${contact.company ? ` - ${contact.company}` : ""}`;
     }, [watchedContactId, contacts]);
 
     const onSubmit = async (data: DealFormData) => {
@@ -149,22 +149,22 @@ export function DealDialog({
                 await updateDeal({
                     id: deal.id,
                     updates: {
-                        ...data,
-                        value: Number(data.value),
+                        ...(data as any),
+                        value: Number(data.value) as any,
                         probability: Number(data.probability),
-                        contact_id: data.contact_id === "none" ? null : data.contact_id,
+                        contactId: data.contactId === "none" ? null : data.contactId,
                     },
                 });
                 toast.success("Deal updated successfully");
             } else {
                 await createDeal({
-                    ...data,
+                    ...(data as any),
                     organization_id: organizationId,
                     pipeline_id: pipelineId,
-                    value: Number(data.value),
+                    value: Number(data.value) as any,
                     probability: Number(data.probability),
-                    contact_id: data.contact_id === "none" ? null : data.contact_id,
-                    expected_close_date: data.expected_close_date || null,
+                    contactId: data.contactId === "none" ? null : data.contactId,
+                    expectedCloseDate: data.expectedCloseDate ? new Date(data.expectedCloseDate) : null,
                     currency: "USD",
                     owner_id: activeProfile?.id || null,
                 });
@@ -192,7 +192,7 @@ export function DealDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                     <div className="space-y-2">
                         <Label htmlFor="name">Deal Name *</Label>
                         <Input
@@ -272,7 +272,7 @@ export function DealDialog({
                                                 <CommandItem
                                                     value="none"
                                                     onSelect={() => {
-                                                        setValue("contact_id", "none");
+                                                        setValue("contactId", "none");
                                                         setContactPopoverOpen(false);
                                                     }}
                                                 >
@@ -286,13 +286,13 @@ export function DealDialog({
                                                 </CommandItem>
                                             )}
                                             {contacts?.map((contact) => {
-                                                const label = `${contact.first_name} ${contact.last_name || ""}${contact.company ? ` - ${contact.company}` : ""}`;
+                                                const label = `${contact.firstName} ${contact.lastName || ""}${contact.company ? ` - ${contact.company}` : ""}`;
                                                 return (
                                                     <CommandItem
                                                         key={contact.id}
                                                         value={label}
                                                         onSelect={() => {
-                                                            setValue("contact_id", contact.id);
+                                                            setValue("contactId", contact.id);
                                                             setContactPopoverOpen(false);
                                                         }}
                                                     >
@@ -317,11 +317,11 @@ export function DealDialog({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="expected_close_date">Expected Close Date</Label>
+                        <Label htmlFor="expectedCloseDate">Expected Close Date</Label>
                         <Input
-                            id="expected_close_date"
+                            id="expectedCloseDate"
                             type="date"
-                            {...register("expected_close_date")}
+                            {...register("expectedCloseDate")}
                         />
                     </div>
 

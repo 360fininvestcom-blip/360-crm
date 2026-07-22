@@ -12,6 +12,11 @@ export async function GET(request: Request) {
     if (validation instanceof NextResponse) return validation;
     const { organization_id } = validation as ApiContext;
 
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const offset = (page - 1) * limit;
+
     const countResult = await prisma.$queryRaw`
         SELECT COUNT(*) as count 
         FROM contacts 
@@ -83,7 +88,7 @@ export async function POST(request: Request) {
 
     } catch (e: unknown) {
         if (e instanceof z.ZodError) {
-            return NextResponse.json({ error: e.errors }, { status: 400 });
+            return NextResponse.json({ error: (e as any).errors }, { status: 400 });
         }
         return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }

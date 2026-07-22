@@ -58,12 +58,12 @@ function hexToHSL(hex: string): { h: number; s: number; l: number } | null {
  */
 export function OrgBrandingProvider({ children }: { children: React.ReactNode }) {
     const { data: profile } = useActiveProfile();
-    const { data: org } = useOrganization(profile?.organization_id || null);
+    const { data: org } = useOrganization(profile?.organizationId || null);
 
     useEffect(() => {
-        if (!org?.primary_color) return;
+        if (!org?.primaryColor) return;
 
-        const hsl = hexToHSL(org.primary_color);
+        const hsl = hexToHSL(org.primaryColor);
         if (!hsl) return;
 
         // Set CSS custom properties for Shadcn UI theming
@@ -87,7 +87,7 @@ export function OrgBrandingProvider({ children }: { children: React.ReactNode })
             root.style.removeProperty("--ring");
             root.style.removeProperty("--accent");
         };
-    }, [org?.primary_color]);
+    }, [org?.primaryColor]);
 
     return <>{children}</>;
 }

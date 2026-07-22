@@ -37,7 +37,7 @@ const customCacheRules = [
 // Intercept fetch requests for dynamic/authentication routes early
 // calling stopImmediatePropagation prevents Serwist from matching and handling them,
 // letting the browser fetch them natively. This prevents PWA fetch/redirect errors on /dashboard.
-self.addEventListener("fetch", (event) => {
+self.addEventListener("fetch", (event: any) => {
     const url = new URL(event.request.url);
     if (
         url.pathname.startsWith("/dashboard") ||

@@ -19,7 +19,7 @@ export function ActivityTimeline() {
     const { data: activities, isLoading } = useActivities(5);
 
     const isAdmin = profile?.role === "admin" || profile?.role === "manager";
-    const myActivities = useMemo(() => isAdmin ? activities : activities?.filter(a => a.created_by === profile?.id), [isAdmin, activities, profile?.id]);
+    const myActivities = useMemo(() => isAdmin ? activities : activities?.filter(a => a.createdById === profile?.id), [isAdmin, activities, profile?.id]);
 
     if (isLoading) {
         return (
@@ -70,7 +70,7 @@ export function ActivityTimeline() {
                             </p>
                         </div>
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {new Date(activity.created_at).toLocaleDateString()}
+                            {new Date(activity.createdAt).toLocaleDateString()}
                         </span>
                     </motion.div>
                 ))}

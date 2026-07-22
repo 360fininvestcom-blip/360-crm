@@ -19,7 +19,7 @@ export function UpcomingTasks() {
     const { data: tasks, isLoading } = useTasks("pending");
 
     const isAdmin = profile?.role === "admin" || profile?.role === "manager";
-    const myTasks = useMemo(() => isAdmin ? tasks : tasks?.filter((t: Task) => t.assigned_to?.id === profile?.id), [isAdmin, tasks, profile?.id]);
+    const myTasks = useMemo(() => isAdmin ? tasks : tasks?.filter((t: Task) => t.assignedTo?.id === profile?.id), [isAdmin, tasks, profile?.id]);
 
     if (isLoading) {
         return (
@@ -61,7 +61,7 @@ export function UpcomingTasks() {
                         <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{task.title}</p>
                             <p className="text-sm text-muted-foreground">
-                                Due: {task.due_date ? new Date(task.due_date).toLocaleDateString() : "No date"}
+                                Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No date"}
                             </p>
                         </div>
                         <Badge

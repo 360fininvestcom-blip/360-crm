@@ -33,8 +33,8 @@ import { Loader2, Code2 } from "lucide-react";
 const templateSchema = z.object({
     name: z.string().min(1, "Template name is required"),
     subject: z.string().min(1, "Subject is required"),
-    body_html: z.string().min(1, "Email body is required"),
-    body_text: z.string().optional(),
+    bodyHtml: z.string().min(1, "Email body is required"),
+    bodyText: z.string().optional(),
 });
 
 type TemplateFormValues = z.infer<typeof templateSchema>;
@@ -63,8 +63,8 @@ export function TemplateDialog({
         defaultValues: {
             name: "",
             subject: "",
-            body_html: "",
-            body_text: "",
+            bodyHtml: "",
+            bodyText: "",
         },
     });
 
@@ -73,15 +73,15 @@ export function TemplateDialog({
             form.reset({
                 name: template.name,
                 subject: template.subject,
-                body_html: template.body_html,
-                body_text: template.body_text || "",
+                bodyHtml: template.bodyHtml || "",
+                bodyText: template.bodyText || "",
             });
         } else {
             form.reset({
                 name: "",
                 subject: "",
-                body_html: "",
-                body_text: "",
+                bodyHtml: "",
+                bodyText: "",
             });
         }
     }, [template, form]);
@@ -91,14 +91,14 @@ export function TemplateDialog({
             if (isEditing && template) {
                 await updateTemplate({
                     id: template.id,
-                    updates: values,
+                    updates: values as any,
                 });
                 toast.success("Template updated successfully");
             } else {
                 await createTemplate({
                     ...values,
-                    organization_id: organizationId,
-                });
+                    organizationId,
+                } as any);
                 toast.success("Template created successfully");
             }
             onOpenChange(false);
@@ -124,9 +124,9 @@ export function TemplateDialog({
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-6">
                         <FormField
-                            control={form.control}
+                            control={form.control as any}
                             name="name"
                             render={({ field }) => (
                                 <FormItem>
@@ -143,7 +143,7 @@ export function TemplateDialog({
                         />
 
                         <FormField
-                            control={form.control}
+                            control={form.control as any}
                             name="subject"
                             render={({ field }) => (
                                 <FormItem>
@@ -160,8 +160,8 @@ export function TemplateDialog({
                         />
 
                         <FormField
-                            control={form.control}
-                            name="body_html"
+                            control={form.control as any}
+                            name="bodyHtml"
                             render={({ field }) => (
                                 <FormItem>
                                     <div className="flex items-center justify-between">
@@ -190,8 +190,8 @@ export function TemplateDialog({
                         />
 
                         <FormField
-                            control={form.control}
-                            name="body_text"
+                            control={form.control as any}
+                            name="bodyText"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Plain Text Version (Optional)</FormLabel>

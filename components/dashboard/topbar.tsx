@@ -148,7 +148,7 @@ export function Topbar() {
                                         className={`flex items-start p-4 gap-3 cursor-pointer border-b last:border-0 transition-colors ${!n.read ? 'bg-primary/5' : ''}`}
                                         onClick={() => {
                                             markAsRead(n.id);
-                                            if (n.link_url) router.push(n.link_url);
+                                            if (n.linkUrl) router.push(n.linkUrl);
                                         }}
                                     >
                                         <div className={cn(
@@ -163,7 +163,7 @@ export function Topbar() {
                                                     {n.title}
                                                 </span>
                                                 <span className="text-[10px] text-muted-foreground shrink-0">
-                                                    {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
                                             </div>
                                             <p className="text-xs text-muted-foreground line-clamp-2">
@@ -189,15 +189,15 @@ export function Topbar() {
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                         <Avatar className="h-9 w-9">
-                            <AvatarImage src={profile?.avatar_url} alt={profile?.full_name || "User"} />
-                            <AvatarFallback className="bg-primary/10 text-primary">{profile?.full_name?.[0] || "U"}</AvatarFallback>
+                            <AvatarImage src={profile?.avatarUrl || undefined} alt={profile?.fullName || "User"} />
+                            <AvatarFallback className="bg-primary/10 text-primary">{profile?.fullName?.[0] || "U"}</AvatarFallback>
                         </Avatar>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-medium leading-none">{profile?.full_name || "User"}</p>
+                            <p className="text-sm font-medium leading-none">{profile?.fullName || "User"}</p>
                             <p className="text-xs leading-none text-muted-foreground">
                                 {profile?.email}
                             </p>

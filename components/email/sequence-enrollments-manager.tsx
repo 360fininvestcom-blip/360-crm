@@ -72,8 +72,8 @@ export function SequenceEnrollmentsManager({
     const [addSearch, setAddSearch] = useState("");
     const [selectedToAdd, setSelectedToAdd] = useState<string[]>([]);
 
-    const filteredEnrollments = (enrollments || []).filter((e: SequenceEnrollment) => {
-        const name = `${e.contact?.first_name || ""} ${e.contact?.last_name || ""}`.toLowerCase();
+    const filteredEnrollments = (enrollments || []).filter((e: any) => {
+        const name = `${e.contact?.firstName || ""} ${e.contact?.lastName || ""}`.toLowerCase();
         const email = (e.contact?.email || "").toLowerCase();
         const s = search.toLowerCase();
         return name.includes(s) || email.includes(s);
@@ -150,10 +150,10 @@ export function SequenceEnrollmentsManager({
         }
     };
 
-    const enrolledContactIds = new Set((enrollments || []).map((e: SequenceEnrollment) => e.contact_id));
+    const enrolledContactIds = new Set((enrollments || []).map((e: SequenceEnrollment) => e.contactId));
     const availableContacts = (allContacts || []).filter((c) =>
         !enrolledContactIds.has(c.id) &&
-        (`${c.first_name} ${c.last_name} ${c.email}`.toLowerCase().includes(addSearch.toLowerCase()))
+        (`${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(addSearch.toLowerCase()))
     );
 
     const toggleSelectAll = () => {
@@ -306,7 +306,7 @@ export function SequenceEnrollmentsManager({
                                                 </TableCell>
                                                 <TableCell>
                                                     <div>
-                                                        <p className="font-medium">{c.first_name} {c.last_name}</p>
+                                                        <p className="font-medium">{c.firstName} {c.lastName}</p>
                                                         <p className="text-xs text-muted-foreground">{c.email}</p>
                                                     </div>
                                                 </TableCell>
@@ -353,7 +353,7 @@ export function SequenceEnrollmentsManager({
                             </TableHeader>
                             <TableBody>
                                 <AnimatePresence mode="popLayout">
-                                    {filteredEnrollments.map((e) => (
+                                    {filteredEnrollments.map((e: any) => (
                                         <motion.tr
                                             key={e.id}
                                             layout
@@ -376,12 +376,12 @@ export function SequenceEnrollmentsManager({
                                             </TableCell>
                                             <TableCell>
                                                 <div>
-                                                    <p className="font-medium">{e.contact?.first_name} {e.contact?.last_name}</p>
+                                                    <p className="font-medium">{e.contact?.firstName} {e.contact?.lastName}</p>
                                                     <p className="text-xs text-muted-foreground">{e.contact?.email}</p>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline">Step {e.current_step + 1}</Badge>
+                                                <Badge variant="outline">Step {e.currentStep + 1}</Badge>
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className={cn("capitalize px-2 py-0.5", getStatusStyle(e.status))}>
@@ -389,10 +389,10 @@ export function SequenceEnrollmentsManager({
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                                                {e.next_send_at ? (
+                                                {e.nextSendAt ? (
                                                     <div className="flex items-center gap-1.5 font-medium text-foreground">
                                                         <Clock className="h-3 w-3 text-primary" />
-                                                        {new Date(e.next_send_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        {new Date(e.nextSendAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                     </div>
                                                 ) : (
                                                     <span className="opacity-50">—</span>

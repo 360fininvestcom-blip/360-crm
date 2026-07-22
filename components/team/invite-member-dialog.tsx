@@ -44,7 +44,7 @@ export function InviteMemberDialog({
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!activeProfile?.organization_id) {
+        if (!activeProfile?.organizationId) {
             toast.error("Organization ID not found");
             return;
         }
@@ -63,7 +63,7 @@ export function InviteMemberDialog({
                     password: tempPassword,
                     full_name: fullName,
                     role,
-                    organization_id: activeProfile.organization_id,
+                    organizationId: activeProfile?.organizationId || "",
                 }),
             });
 

@@ -8,8 +8,11 @@ import { Prisma } from "@prisma/client";
 export async function getAllContactsForExport(ownerId?: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
-    let query = Prisma.sql`SELECT * FROM contacts WHERE organization_id = CAST(${session.user.organizationId} AS UUID)`;
+    let query = Prisma.sql`SELECT * FROM contacts WHERE organization_id = CAST(${organizationId} AS UUID)`;
 
     if (ownerId) {
         query = Prisma.sql`${query} AND owner_id = ${ownerId}`;
@@ -22,8 +25,11 @@ export async function getAllContactsForExport(ownerId?: string) {
 export async function getContactsForAutoDialer(filters: { search?: string, status?: string, ownerId?: string }) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
-    let query = Prisma.sql`SELECT first_name, last_name, phone FROM contacts WHERE organization_id = CAST(${session.user.organizationId} AS UUID)`;
+    let query = Prisma.sql`SELECT first_name, last_name, phone FROM contacts WHERE organization_id = CAST(${organizationId} AS UUID)`;
 
     if (filters.search) {
         const searchPattern = `%${filters.search}%`;
@@ -52,6 +58,9 @@ export async function getContactsByIds(ids: string[]) {
 
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     // Must map ids to Prisma.sql cast if they are UUIDs. 
     // BUT we can use prisma.contact since we don't have complex types, oh wait, Prisma schema is NOT available, we use queryRaw!
@@ -63,7 +72,7 @@ export async function getContactsByIds(ids: string[]) {
     const query = Prisma.sql`
         SELECT first_name, last_name, phone 
         FROM contacts 
-        WHERE organization_id = CAST(${session.user.organizationId} AS UUID) 
+        WHERE organization_id = CAST(${organizationId} AS UUID) 
         AND id IN (${inList})
     `;
 
@@ -74,11 +83,14 @@ export async function getContactsByIds(ids: string[]) {
 export async function getContactById(id: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const data = await prisma.$queryRaw`
         SELECT * FROM contacts
         WHERE id = CAST(${id} AS UUID)
-        AND organization_id = CAST(${session.user.organizationId} AS UUID)
+        AND organization_id = CAST(${organizationId} AS UUID)
         LIMIT 1
     `;
     
@@ -89,6 +101,9 @@ export async function getContactById(id: string) {
 export async function getActivitiesForContact(contactId: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const data = await prisma.$queryRaw`
         SELECT 
@@ -109,6 +124,9 @@ export async function getActivitiesForContact(contactId: string) {
 export async function getDealsForContact(contactId: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const data = await prisma.$queryRaw`
         SELECT * FROM deals
@@ -122,6 +140,9 @@ export async function getDealsForContact(contactId: string) {
 export async function getTasksForContact(contactId: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const data = await prisma.$queryRaw`
         SELECT 
@@ -141,11 +162,14 @@ export async function getTasksForContact(contactId: string) {
 export async function addNoteToContact(contactId: string, description: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const data = await prisma.$queryRaw`
         INSERT INTO activities (organization_id, contact_id, type, title, description, created_by)
         VALUES (
-            CAST(${session.user.organizationId} AS UUID),
+            CAST(${organizationId} AS UUID),
             CAST(${contactId} AS UUID),
             'note',
             'Note added',
@@ -175,11 +199,14 @@ export async function addNoteToContact(contactId: string, description: string) {
 export async function getTestContacts(limit: number = 20) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const data = await prisma.$queryRaw`
         SELECT id, first_name, last_name, email 
         FROM contacts
-        WHERE organization_id = CAST(${session.user.organizationId} AS UUID)
+        WHERE organization_id = CAST(${organizationId} AS UUID)
         ORDER BY first_name ASC
         LIMIT ${limit}
     `;

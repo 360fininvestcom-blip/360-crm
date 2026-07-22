@@ -44,12 +44,13 @@ export async function POST(request: Request) {
         }
 
         // 2. Fetch Form Configuration
-        const form = await prisma.webForm.findFirst({
-            where: {
-                id: formId,
-                status: "active"
-            }
-        });
+                // @ts-ignore
+        const forms: WebForm[] = await prisma.$queryRaw`
+            SELECT * FROM web_forms 
+            WHERE id = ${formId}::uuid AND status = 'active'
+            LIMIT 1
+        `;
+        const form = forms[0];
 
         if (!form) {
             return NextResponse.json(

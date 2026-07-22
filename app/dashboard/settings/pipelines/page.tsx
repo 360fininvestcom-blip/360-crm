@@ -44,7 +44,7 @@ export default function PipelineSettingsPage() {
     const handleStartEdit = (pipeline: Pipeline) => {
         setEditingPipelineId(pipeline.id);
         setEditName(pipeline.name);
-        setEditStages(pipeline.stages || []);
+        setEditStages((pipeline.stages as unknown as Stage[]) || []);
     };
 
     const handleAddStage = () => {
@@ -57,21 +57,22 @@ export default function PipelineSettingsPage() {
     };
 
     const handleSave = async () => {
-        if (!profile?.organization_id) return;
+        if (!profile?.organizationId) return;
 
         try {
             if (editingPipelineId === "new") {
                 await createPipeline({
-                    organization_id: profile.organization_id,
+                    organizationId: profile.organizationId,
                     name: editName,
-                    stages: editStages,
-                    is_default: (pipelines?.length || 0) === 0
+                    stages: editStages as any,
+                    isDefault: (pipelines?.length || 0) === 0,
+                    createdAt: new Date()
                 });
                 toast.success("Pipeline created");
             } else if (editingPipelineId) {
                 await updatePipeline({
                     id: editingPipelineId,
-                    updates: { name: editName, stages: editStages }
+                    updates: { name: editName, stages: editStages as any }
                 });
                 toast.success("Pipeline updated");
             }
@@ -176,10 +177,10 @@ export default function PipelineSettingsPage() {
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-semibold text-lg">{p.name}</h3>
-                                        {p.is_default && <Badge variant="secondary">Default</Badge>}
+                                        {p.isDefault && <Badge variant="secondary">Default</Badge>}
                                     </div>
                                     <div className="flex gap-1 overflow-hidden">
-                                        {p.stages?.map((s, i) => (
+                                        {(p.stages as any[])?.map((s, i) => (
                                             <div key={i} className={`h-2 w-8 rounded-full ${s.color || 'bg-slate-300'}`} title={s.name} />
                                         ))}
                                     </div>

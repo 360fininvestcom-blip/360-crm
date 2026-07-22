@@ -54,11 +54,11 @@ function DealCard({
     onNotes: () => void;
     onDelete: () => void;
 }) {
-    const contactName = deal.contact
-        ? `${deal.contact.first_name} ${deal.contact.last_name || ""}`
+    const contactName = (deal as any).contact
+        ? `${(deal as any).contact?.firstName} ${(deal as any).contact.lastName || ""}`
         : "No contact";
-    const initials = deal.contact
-        ? `${deal.contact.first_name[0]}${deal.contact.last_name?.[0] || ""}`
+    const initials = (deal as any).contact
+        ? `${(deal as any).contact?.firstName[0]}${(deal as any).contact.lastName?.[0] || ""}`
         : "?";
 
     return (
@@ -90,7 +90,7 @@ function DealCard({
             <div className="space-y-2">
                 <div className="flex items-center text-lg font-bold text-primary">
                     <DollarSign className="h-4 w-4" />
-                    {formatCurrency(deal.value)}
+                    {formatCurrency(Number(deal.value))}
                 </div>
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -101,10 +101,10 @@ function DealCard({
                 </div>
 
                 <div className="flex items-center justify-between">
-                    {deal.expected_close_date && (
+                    {deal.expectedCloseDate && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Calendar className="h-3 w-3" />
-                            {new Date(deal.expected_close_date).toLocaleDateString("en-US", {
+                            {new Date(deal.expectedCloseDate).toLocaleDateString("en-US", {
                                 month: "short",
                                 day: "numeric",
                             })}
@@ -145,8 +145,8 @@ export default function DealsPage() {
     const filteredDeals = (deals || []).filter((deal) => {
         const matchesSearch = deal.name.toLowerCase().includes(filters.search.toLowerCase());
         const matchesStage = filters.stage === "all" || deal.stage === filters.stage;
-        const matchesMinValue = filters.minValue === "" || deal.value >= Number(filters.minValue);
-        const matchesMaxValue = filters.maxValue === "" || deal.value <= Number(filters.maxValue);
+        const matchesMinValue = filters.minValue === "" || Number(deal.value) >= Number(filters.minValue);
+        const matchesMaxValue = filters.maxValue === "" || Number(deal.value) <= Number(filters.maxValue);
         const matchesMinProb = filters.minProbability === "" || deal.probability >= Number(filters.minProbability);
         const matchesMaxProb = filters.maxProbability === "" || deal.probability <= Number(filters.maxProbability);
 
@@ -157,11 +157,11 @@ export default function DealsPage() {
         filteredDeals.filter((deal) => deal.stage === stageId);
 
     const totalPipelineValue = filteredDeals.reduce(
-        (acc, deal) => acc + deal.value,
+        (acc, deal) => acc + Number(deal.value),
         0
     );
     const weightedValue = filteredDeals.reduce(
-        (acc, deal) => acc + deal.value * (deal.probability / 100),
+        (acc, deal) => acc + Number(deal.value) * (deal.probability / 100),
         0
     );
 
@@ -287,7 +287,7 @@ export default function DealsPage() {
                 <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2">
                     {stages.map((stage) => {
                         const stageDeals = getDealsForStage(stage.id);
-                        const stageValue = stageDeals.reduce((acc, d) => acc + d.value, 0);
+                        const stageValue = stageDeals.reduce((acc, d) => acc + Number(d.value), 0);
 
                         return (
                             <div
@@ -342,7 +342,7 @@ export default function DealsPage() {
                 }}
                 deal={editingDeal}
                 pipelineId={selectedPipelineId === 'all' ? (pipelines?.[0]?.id || "") : selectedPipelineId}
-                organizationId={activeProfile?.organization_id || ""}
+                organizationId={activeProfile?.organizationId || ""}
                 stages={stages}
                 onSuccess={handleSuccess}
             />

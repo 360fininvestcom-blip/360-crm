@@ -118,13 +118,16 @@ export function EventDialog({
             endDateTime.setHours(endHours, endMinutes);
 
             await createEvent({
-                organization_id: orgId,
+                organizationId: orgId,
                 title: values.title,
-                description: values.description,
-                start_time: startDateTime.toISOString(),
-                end_time: endDateTime.toISOString(),
-                all_day: values.all_day,
-                created_by: userId,
+                description: values.description || null,
+                startTime: startDateTime,
+                endTime: endDateTime,
+                allDay: values.all_day,
+                createdById: userId || null,
+                contactId: null,
+                dealId: null,
+                createdAt: new Date(),
             });
 
             toast.success("Event created successfully");

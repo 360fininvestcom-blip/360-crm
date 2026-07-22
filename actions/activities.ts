@@ -8,6 +8,9 @@ import { Prisma } from "@prisma/client";
 export async function getActivities(page: number, pageSize: number, typeFilter: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const offset = (page - 1) * pageSize;
 
@@ -30,7 +33,7 @@ export async function getActivities(page: number, pageSize: number, typeFilter: 
         LEFT JOIN contacts c ON a.contact_id = c.id
         LEFT JOIN deals d ON a.deal_id = d.id
         LEFT JOIN profiles p ON a.created_by = p.id
-        WHERE a.organization_id = CAST(${session.user.organizationId} AS UUID)
+        WHERE a.organization_id = CAST(${organizationId} AS UUID)
     `;
 
     if (typeFilter && typeFilter !== "all") {

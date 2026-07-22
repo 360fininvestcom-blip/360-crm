@@ -30,18 +30,12 @@ interface SipAccountDialogProps {
 }
 
 interface SipFormData {
-    name: string;
-    display_name: string;
-    sip_username: string;
-    sip_auth_user: string;
-    sip_password: string;
-    sip_domain: string;
-    ws_server: string;
-    sip_protocol: string;
-    outbound_proxy: string;
-    registrar_server: string;
-    engine: "janus" | "crococall" | "jssip";
-    is_default: boolean;
+    displayName: string;
+    sipUsername: string;
+    sipPassword: string;
+    sipDomain: string;
+    outboundProxy: string;
+    isDefault: boolean;
 }
 
 export function SipAccountDialog({
@@ -57,48 +51,33 @@ export function SipAccountDialog({
 
     const form = useForm<SipFormData>({
         defaultValues: {
-            name: "",
-            display_name: "",
-            sip_username: "",
-            sip_auth_user: "",
-            sip_password: "",
-            sip_domain: "",
-            ws_server: "",
-            sip_protocol: "wss",
-            outbound_proxy: "",
-            registrar_server: "",
-            engine: "janus",
-            is_default: false,
+            displayName: "",
+            sipUsername: "",
+            sipPassword: "",
+            sipDomain: "",
+            outboundProxy: "",
+            isDefault: false,
         }
     });
 
     useEffect(() => {
         if (account && open) {
             form.reset({
-                name: account.name || "",
-                display_name: account.display_name || "",
-                sip_username: account.sip_username || "",
-                sip_auth_user: account.sip_auth_user || "",
-                sip_password: "", // Don't populate password
-                sip_domain: account.sip_domain || "",
-                ws_server: account.websocket_server || "",
-                sip_protocol: account.sip_protocol || "wss",
-                outbound_proxy: account.outbound_proxy || "",
-                registrar_server: account.registrar_server || "",
-                engine: account.engine || "janus",
-                is_default: account.is_default || false,
+                displayName: account.displayName || "",
+                sipUsername: account.sipUsername || "",
+                sipPassword: "", // Don't populate password
+                sipDomain: account.sipDomain || "",
+                outboundProxy: account.outboundProxy || "",
+                isDefault: account.isDefault || false,
             });
         } else if (!account && open) {
             form.reset({
-                name: "",
-                display_name: "",
-                sip_username: "",
-                sip_password: "",
-                sip_domain: "",
-                outbound_proxy: "",
-                registrar_server: "",
-                engine: "janus",
-                is_default: false,
+                displayName: "",
+                sipUsername: "",
+                sipPassword: "",
+                sipDomain: "",
+                outboundProxy: "",
+                isDefault: false,
             });
         }
     }, [account, open, form]);
@@ -106,24 +85,18 @@ export function SipAccountDialog({
     const onSubmit = async (data: SipFormData) => {
         try {
             const accountData: Partial<SIPProfile> = {
-                name: data.name || "SIP Account",
-                display_name: data.display_name,
-                sip_username: data.sip_username,
-                sip_auth_user: data.sip_auth_user || undefined,
-                sip_domain: data.sip_domain,
-                websocket_server: undefined,
-                sip_protocol: "wss",
-                outbound_proxy: data.outbound_proxy || undefined,
-                registrar_server: data.registrar_server || undefined,
-                janus_url: "wss://sip.nanocall.space:8989", // Janus Secure WebSocket on port 8989
-                engine: data.engine,
-                is_default: data.is_default,
-                is_active: true,
+                displayName: data.displayName,
+                sipUsername: data.sipUsername,
+                sipDomain: data.sipDomain,
+                outboundProxy: data.outboundProxy || null,
+                isDefault: data.isDefault,
+                isActive: account ? account.isActive : true, // Preserve active status or default to true
             };
 
-            // Only include password if provided (for updates, empty means keep existing)
-            if (data.sip_password) {
-                accountData.sip_password_encrypted = data.sip_password; // Will be encrypted by backend
+            // Only add password if it was changed or it's a new account
+            if (data.sipPassword) {
+                // The API will encrypt this
+                accountData.sipPasswordEncrypted = data.sipPassword;
             }
 
             await saveAccount({
@@ -159,45 +132,6 @@ export function SipAccountDialog({
 
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
                     <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Account Name</Label>
-                            <Input
-                                id="name"
-                                {...form.register("name")}
-                                placeholder="e.g. Work SIP, Personal Line"
-                            />
-                            <p className="text-xs text-muted-foreground">A friendly name to identify this account</p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="engine">Call Engine / Provider</Label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <Button
-                                    type="button"
-                                    variant={form.watch("engine") === "janus" ? "default" : "outline"}
-                                    className="justify-start gap-2"
-                                    onClick={() => form.setValue("engine", "janus")}
-                                >
-                                    <Server className="h-4 w-4" />
-                                    Janus Bridge
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={form.watch("engine") === "crococall" ? "default" : "outline"}
-                                    className="justify-start gap-2"
-                                    onClick={() => form.setValue("engine", "crococall")}
-                                >
-                                    <Globe className="h-4 w-4" />
-                                    Crococall API
-                                </Button>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground">
-                                {form.watch("engine") === "janus" 
-                                    ? "Recommended. Uses our high-performance secure bridge." 
-                                    : "Direct connection to Crococall WebRTC services."}
-                            </p>
-                        </div>
-
                         <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                             <div className="space-y-0.5">
                                 <Label className="flex items-center gap-2">
@@ -207,8 +141,8 @@ export function SipAccountDialog({
                                 <p className="text-xs text-muted-foreground">Use this account for outbound calls by default</p>
                             </div>
                             <Switch
-                                checked={form.watch("is_default")}
-                                onCheckedChange={(val) => form.setValue("is_default", val)}
+                                checked={form.watch("isDefault")}
+                                onCheckedChange={(val) => form.setValue("isDefault", val)}
                             />
                         </div>
                     </div>
@@ -222,56 +156,47 @@ export function SipAccountDialog({
                         </h4>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="display_name">Display Name (Caller ID)</Label>
+                                <Label htmlFor="displayName">Display Name (Caller ID)</Label>
                                 <Input
-                                    id="display_name"
-                                    {...form.register("display_name")}
+                                    id="displayName"
+                                    {...form.register("displayName")}
                                     placeholder="John Doe"
                                     required
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="sip_username">SIP Username (Extension)</Label>
+                                <Label htmlFor="sipUsername">SIP Username (Extension)</Label>
                                 <Input
-                                    id="sip_username"
-                                    {...form.register("sip_username")}
+                                    id="sipUsername"
+                                    {...form.register("sipUsername")}
                                     placeholder="e.g. 1001"
                                     required
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="sip_auth_user">Authorization Username (Optional)</Label>
+                                <Label htmlFor="sipPassword">SIP Password</Label>
                                 <Input
-                                    id="sip_auth_user"
-                                    {...form.register("sip_auth_user")}
-                                    placeholder="e.g. auth1001"
-                                />
-                                <p className="text-[10px] text-muted-foreground">Often different from extension for complex providers</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="sip_password">SIP Password</Label>
-                                <Input
-                                    id="sip_password"
+                                    id="sipPassword"
                                     type="password"
-                                    {...form.register("sip_password")}
+                                    {...form.register("sipPassword")}
                                     placeholder={isEditing ? "•••••••• (hidden)" : "Password"}
                                     required={!isEditing}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="sip_domain">SIP Domain (Registrar)</Label>
+                                <Label htmlFor="sipDomain">SIP Domain (Registrar)</Label>
                                 <Input
-                                    id="sip_domain"
-                                    {...form.register("sip_domain")}
+                                    id="sipDomain"
+                                    {...form.register("sipDomain")}
                                     placeholder="sip.provider.com"
                                     required
                                 />
                             </div>
                             <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="outbound_proxy">Outbound Proxy (Optional)</Label>
+                                <Label htmlFor="outboundProxy">Outbound Proxy (Optional)</Label>
                                 <Input
-                                    id="outbound_proxy"
-                                    {...form.register("outbound_proxy")}
+                                    id="outboundProxy"
+                                    {...form.register("outboundProxy")}
                                     placeholder="sip:proxy.provider.com:5060"
                                 />
                             </div>

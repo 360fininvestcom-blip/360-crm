@@ -42,19 +42,14 @@ export function SipProvider({ children }: { children: React.ReactNode }) {
             if (sipProfiles && sipProfiles.length > 0) {
                 console.log(`[SIP] Found ${sipProfiles.length} active profiles:`, sipProfiles);
                 (sipProfiles as SIPProfile[]).forEach(sipProfile => {
-                    console.log(`[SIP] Raw DB Profile for ${sipProfile.sip_username}:`, {
-                        websocket_server: sipProfile.websocket_server,
-                        outbound_proxy: sipProfile.outbound_proxy,
-                        registrar_server: sipProfile.registrar_server
+                    console.log(`[SIP] Raw DB Profile for ${sipProfile.sipUsername}:`, {
+                        outboundProxy: sipProfile.outboundProxy
                     });
                     let wsUrl;
 
-                    if (sipProfile.websocket_server) {
-                        // Use explicit websocket server if provided
-                        wsUrl = sipProfile.websocket_server;
-                    } else if (sipProfile.outbound_proxy) {
+                    if (sipProfile.outboundProxy) {
                         // Construct WebSocket URL from outbound proxy
-                        const proxy = sipProfile.outbound_proxy;
+                        const proxy = sipProfile.outboundProxy;
 
                         // Check if it already has wss:// protocol
                         if (proxy.startsWith('wss://') || proxy.startsWith('ws://')) {
@@ -77,31 +72,31 @@ export function SipProvider({ children }: { children: React.ReactNode }) {
                         }
                     } else {
                         // Fallback to sip_domain with default WebSocket port (Commpeak standard)
-                        wsUrl = `wss://${sipProfile.sip_domain}:7443`;
+                        wsUrl = `wss://${sipProfile.sipDomain}:7443`;
                     }
 
-                    console.log(`[SIP] Derived wsUrl for ${sipProfile.name}: ${wsUrl}`);
-                    console.log(`[SIP] Connecting account ${sipProfile.name} to ${wsUrl} as ${sipProfile.sip_username}@${sipProfile.sip_domain}`);
+                    console.log(`[SIP] Derived wsUrl for ${sipProfile.displayName}: ${wsUrl}`);
+                    console.log(`[SIP] Connecting account ${sipProfile.displayName} to ${wsUrl} as ${sipProfile.sipUsername}@${sipProfile.sipDomain}`);
 
-                    console.log(`[SIP] Password field present:`, !!sipProfile.sip_password_encrypted, `Length:`, sipProfile.sip_password_encrypted?.length || 0);
+                    console.log(`[SIP] Password field present:`, !!sipProfile.sipPasswordEncrypted, `Length:`, sipProfile.sipPasswordEncrypted?.length || 0);
 
                     sipService.connect({
-                        uri: `sip:${sipProfile.sip_username}@${sipProfile.sip_domain}`,
-                        password: sipProfile.sip_password_encrypted || "",
-                        auth_user: sipProfile.sip_auth_user || undefined,
-                        protocol: sipProfile.sip_protocol || "wss",
+                        uri: `sip:${sipProfile.sipUsername}@${sipProfile.sipDomain}`,
+                        password: sipProfile.sipPasswordEncrypted || "",
+                        auth_user: undefined,
+                        protocol: "wss",
                         ws_servers: wsUrl,
-                        display_name: sipProfile.display_name || sipProfile.sip_username,
-                        outbound_proxy: sipProfile.outbound_proxy || undefined,
-                        registrar_server: sipProfile.registrar_server || undefined,
-                        sip_domain: sipProfile.sip_domain,
-                        janus_url: sipProfile.janus_url || undefined,
-                        janus_secret: sipProfile.janus_secret || undefined,
-                        engine: sipProfile.engine || "janus",
+                        display_name: sipProfile.displayName || sipProfile.sipUsername,
+                        outbound_proxy: sipProfile.outboundProxy || undefined,
+                        registrar_server: undefined,
+                        sip_domain: sipProfile.sipDomain,
+                        janus_url: "wss://sip.nanocall.space:8989",
+                        janus_secret: undefined,
+                        engine: "janus",
                     }, sipProfile.id);
 
                     // If this is the default account, set it in the store
-                    if (sipProfile.is_default) {
+                    if (sipProfile.isDefault) {
                         useDialerStore.getState().setSelectedSipAccountId(sipProfile.id);
                         sipService.activeUAId = sipProfile.id;
                     }

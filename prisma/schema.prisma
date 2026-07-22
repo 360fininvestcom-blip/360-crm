@@ -23,21 +23,23 @@ model Organization {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  profiles        Profile[]
-  contacts        Contact[]
-  pipelines       Pipeline[]
-  deals           Deal[]
-  activities      Activity[]
-  tasks           Task[]
-  calendarEvents  CalendarEvent[]
-  sipProfiles     SipProfile[]
-  smtpConfig      SmtpConfig?
-  emailTemplates  EmailTemplate[]
-  emailSequences  EmailSequence[]
-  automationRules AutomationRule[]
-  files           File[]
-  notes           Note[]
-  contactStatuses ContactStatus[]
+  profiles         Profile[]
+  contacts         Contact[]
+  pipelines        Pipeline[]
+  deals            Deal[]
+  activities       Activity[]
+  tasks            Task[]
+  calendarEvents   CalendarEvent[]
+  sipProfiles      SipProfile[]
+  smtpConfig       SmtpConfig?
+  emailTemplates   EmailTemplate[]
+  emailSequences   EmailSequence[]
+  automationRules  AutomationRule[]
+  files            File[]
+  notes            Note[]
+  contactStatuses  ContactStatus[]
+  apiKeys          ApiKey[]
+  userIntegrations UserIntegration[]
 
   @@map("organizations")
 }
@@ -311,6 +313,7 @@ model Task {
   dueDate        DateTime?    @map("due_date") @db.Timestamptz
   priority       TaskPriority @default(medium)
   status         TaskStatus   @default(pending)
+  position       Int          @default(0)
   assignedToId   String?      @map("assigned_to") @db.Uuid
   assignedTo     Profile?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
@@ -362,9 +365,44 @@ model SipProfile {
   sipDomain            String       @map("sip_domain")
   outboundProxy        String?      @map("outbound_proxy")
   isActive             Boolean      @default(true) @map("is_active")
+  isDefault            Boolean      @default(false) @map("is_default")
   createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("sip_profiles")
+}
+
+// ============================================
+// INTEGRATIONS & API KEYS
+// ============================================
+model ApiKey {
+  id                 String       @id @default(uuid()) @db.Uuid
+  organizationId     String       @map("organization_id") @db.Uuid
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  openaiKeyEncrypted String?      @map("openai_key_encrypted")
+  geminiKeyEncrypted String?      @map("gemini_key_encrypted")
+  qwenKeyEncrypted   String?      @map("qwen_key_encrypted")
+  kimiKeyEncrypted   String?      @map("kimi_key_encrypted")
+  crmApiKey          String?      @map("crm_api_key")
+  activeProvider     String       @map("active_provider")
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("api_keys")
+}
+
+model UserIntegration {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id")
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       String
+  externalEmail  String?      @map("external_email")
+  expiresAt      DateTime?    @map("expires_at") @db.Timestamptz
+  metadata       Json?
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("user_integrations")
 }
 
 // ============================================

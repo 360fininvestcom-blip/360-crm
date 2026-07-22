@@ -37,54 +37,36 @@ export function EmailAccountDialog({
 
     const form = useForm({
         defaultValues: {
-            name: "",
-            smtp_host: "",
-            smtp_port: 587,
-            smtp_user: "",
-            smtp_pass: "",
-            from_name: "",
-            email_addr: "",
-            imap_host: "",
-            imap_port: 993,
-            imap_user: "",
-            imap_pass: "",
-            is_org_wide: false,
-            use_tls: true,
+            host: "",
+            port: 587,
+            username: "",
+            password: "",
+            fromName: "",
+            fromEmail: "",
+            useTls: true,
         }
     });
 
     useEffect(() => {
         if (account && open) {
             form.reset({
-                name: account.name || "",
-                smtp_host: account.smtp_host,
-                smtp_port: account.smtp_port,
-                smtp_user: account.smtp_user,
-                smtp_pass: "", // Don't populate password
-                from_name: account.from_name || "",
-                email_addr: account.email_addr,
-                imap_host: account.imap_host || "",
-                imap_port: account.imap_port || 993,
-                imap_user: account.imap_user || "",
-                imap_pass: "", // Don't populate password
-                is_org_wide: account.is_org_wide,
-                use_tls: account.use_tls,
+                host: account.host,
+                port: account.port,
+                username: account.username,
+                password: "", // Don't populate password
+                fromName: account.fromName || "",
+                fromEmail: account.fromEmail || "",
+                useTls: account.useTls,
             });
         } else if (!account && open) {
             form.reset({
-                name: "",
-                smtp_host: "",
-                smtp_port: 587,
-                smtp_user: "",
-                smtp_pass: "",
-                from_name: "",
-                email_addr: "",
-                imap_host: "",
-                imap_port: 993,
-                imap_user: "",
-                imap_pass: "",
-                is_org_wide: false,
-                use_tls: true,
+                host: "",
+                port: 587,
+                username: "",
+                password: "",
+                fromName: "",
+                fromEmail: "",
+                useTls: true,
             });
         }
     }, [account, open, form]);
@@ -112,31 +94,11 @@ export function EmailAccountDialog({
                         {account ? "Edit Email Account" : "Add Email Account"}
                     </DialogTitle>
                     <DialogDescription>
-                        Configure your SMTP and IMAP settings for sending and receiving emails.
+                        Configure your SMTP settings for sending emails.
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2 sm:col-span-2">
-                            <Label htmlFor="name">Account Display Name</Label>
-                            <Input id="name" {...form.register("name")} placeholder="e.g. Support Inbox, Personal Gmail" required />
-                        </div>
-
-                        <div className="flex items-center justify-between sm:col-span-2 p-3 rounded-lg border bg-muted/30">
-                            <div className="space-y-0.5">
-                                <Label>Organization Wide</Label>
-                                <p className="text-xs text-muted-foreground">Allow all authorized users in the organization to use this account.</p>
-                            </div>
-                            <Switch
-                                checked={form.watch("is_org_wide")}
-                                onCheckedChange={(val) => form.setValue("is_org_wide", val)}
-                            />
-                        </div>
-                    </div>
-
-                    <Separator />
-
                     <div className="space-y-4">
                         <h4 className="text-sm font-semibold flex items-center gap-2">
                             <Server className="h-4 w-4" />
@@ -144,57 +106,44 @@ export function EmailAccountDialog({
                         </h4>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="smtp_host">SMTP Host</Label>
-                                <Input id="smtp_host" {...form.register("smtp_host")} placeholder="smtp.gmail.com" required />
+                                <Label htmlFor="host">SMTP Host</Label>
+                                <Input id="host" {...form.register("host")} placeholder="smtp.gmail.com" required />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="smtp_port">SMTP Port</Label>
-                                <Input id="smtp_port" type="number" {...form.register("smtp_port", { valueAsNumber: true })} placeholder="587" required />
+                                <Label htmlFor="port">SMTP Port</Label>
+                                <Input id="port" type="number" {...form.register("port", { valueAsNumber: true })} placeholder="587" required />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="smtp_user">SMTP Username</Label>
-                                <Input id="smtp_user" {...form.register("smtp_user")} placeholder="user@example.com" required />
+                                <Label htmlFor="username">SMTP Username</Label>
+                                <Input id="username" {...form.register("username")} placeholder="user@example.com" required />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="smtp_pass">SMTP Password</Label>
-                                <Input id="smtp_pass" type="password" {...form.register("smtp_pass")} placeholder={account ? "•••••••• (hidden)" : "Password"} required={!account} />
+                                <Label htmlFor="password">SMTP Password</Label>
+                                <Input id="password" type="password" {...form.register("password")} placeholder={account ? "•••••••• (hidden)" : "Password"} required={!account} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="from_name">From Name</Label>
-                                <Input id="from_name" {...form.register("from_name")} placeholder="John Doe" />
+                                <Label htmlFor="fromName">Display Name</Label>
+                                <Input id="fromName" {...form.register("fromName")} placeholder="John Doe" required />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="email_addr">From Email</Label>
-                                <Input id="email_addr" type="email" {...form.register("email_addr")} placeholder="john@example.com" required />
+                                <Label htmlFor="fromEmail">Email Address</Label>
+                                <Input id="fromEmail" type="email" {...form.register("fromEmail")} placeholder="john@example.com" required />
                             </div>
                         </div>
                     </div>
 
-                    <Separator />
-
-                    <div className="space-y-4">
-                        <h4 className="text-sm font-semibold flex items-center gap-2">
-                            <Shield className="h-4 w-4" />
-                            IMAP Settings (Receiving - Optional)
-                        </h4>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="imap_host">IMAP Host</Label>
-                                <Input id="imap_host" {...form.register("imap_host")} placeholder="imap.gmail.com" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="imap_port">IMAP Port</Label>
-                                <Input id="imap_port" type="number" {...form.register("imap_port", { valueAsNumber: true })} placeholder="993" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="imap_user">IMAP Username</Label>
-                                <Input id="imap_user" {...form.register("imap_user")} placeholder="user@example.com" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="imap_pass">IMAP Password</Label>
-                                <Input id="imap_pass" type="password" {...form.register("imap_pass")} placeholder={account ? "•••••••• (hidden)" : "Password"} />
-                            </div>
+                    <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                        <div className="space-y-0.5">
+                            <Label className="flex items-center gap-2">
+                                <Shield className="h-4 w-4" />
+                                Use TLS/SSL
+                            </Label>
+                            <p className="text-xs text-muted-foreground">Require secure connection (recommended)</p>
                         </div>
+                        <Switch
+                            checked={form.watch("useTls")}
+                            onCheckedChange={(val) => form.setValue("useTls", val)}
+                        />
                     </div>
 
                     <DialogFooter>

@@ -87,10 +87,20 @@ export async function DELETE(request: Request) {
         if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+        const profiles = await prisma.$queryRaw`
+            SELECT organization_id FROM profiles
+            WHERE user_id = CAST(${user.id} AS UUID)
+            LIMIT 1
+        ` as any[];
+        
+        const profile = profiles[0];
+
+        if (!profile) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
         await prisma.$executeRaw`
             DELETE FROM organization_api_keys
             WHERE id = CAST(${id} AS UUID)
-            AND organization_id = CAST(${user.organizationId} AS UUID)
+            AND organization_id = CAST(${profile.organization_id} AS UUID)
         `;
 
         return NextResponse.json({ success: true });

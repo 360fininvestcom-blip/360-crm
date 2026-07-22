@@ -50,9 +50,10 @@ const formSchema = z.object({
     description: z.string().optional(),
     priority: z.enum(["low", "medium", "high"]),
     status: z.enum(["pending", "in_progress", "completed"]),
-    due_date: z.date().optional(),
-    assigned_to: z.string().optional(),
-    contact_id: z.string().optional(), // We'll handle empty string as null
+    due_date: z.date().optional(), // Kept in schema for now if needed? No, wait, change schema.
+    dueDate: z.date().optional(),
+    assignedTo: z.string().optional(),
+    contactId: z.string().optional(), // We'll handle empty string as null
 });
 
 interface TaskDialogProps {
@@ -93,9 +94,9 @@ export function TaskDialog({
                 description: task.description || "",
                 priority: task.priority,
                 status: task.status,
-                due_date: task.due_date ? new Date(task.due_date) : undefined,
-                assigned_to: task.assigned_to?.id || "",
-                contact_id: task.contact_id || "",
+                dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+                assignedTo: task.assignedTo?.id || "",
+                contactId: task.contactId || "",
             });
         } else {
             form.reset({
@@ -103,26 +104,24 @@ export function TaskDialog({
                 description: "",
                 priority: "medium",
                 status: "pending",
-                assigned_to: "",
-                contact_id: "",
+                dueDate: undefined,
+                assignedTo: "",
+                contactId: "",
             });
         }
     }, [task, form, open]);
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         try {
-
-            // Fix for assigned_to being an object in Task type vs string ID in backend
-            // actually useCreateTask expects Partial<Task> but supabase insert expects the foreign key column "assigned_to" to be a UUID string. 
-            // The Task type define assigned_to as object.
-            // We should cast payload to any to bypass this difference between View Model and DB Model.
-
             const dbPayload = {
-                ...values,
-                organization_id: organizationId,
-                assigned_to: values.assigned_to || null,
-                contact_id: values.contact_id || null,
-                due_date: values.due_date ? values.due_date.toISOString() : null,
+                title: values.title,
+                description: values.description || null,
+                priority: values.priority,
+                status: values.status,
+                dueDate: values.dueDate ? values.dueDate.toISOString() : null,
+                assignedToId: values.assignedTo || null,
+                contactId: values.contactId || null,
+                organizationId: organizationId,
             };
 
             if (isEditing && task) {
@@ -272,11 +271,11 @@ export function TaskDialog({
 
                         <FormField
                             control={form.control}
-                            name="assigned_to"
+                            name="assignedTo"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Assignee</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                                    <FormLabel>Assign To</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select team member" />
@@ -285,7 +284,7 @@ export function TaskDialog({
                                         <SelectContent>
                                             {profiles?.map((profile: Profile) => (
                                                 <SelectItem key={profile.id} value={profile.id}>
-                                                    {profile.full_name || profile.email}
+                                                    {profile.fullName || profile.email}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -297,11 +296,11 @@ export function TaskDialog({
 
                         <FormField
                             control={form.control}
-                            name="contact_id"
+                            name="contactId"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Related Contact</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                                    <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select contact (optional)" />
@@ -311,7 +310,7 @@ export function TaskDialog({
                                             {/* Limit to 50 for performance */}
                                             {contacts?.slice(0, 50).map((contact: Contact) => (
                                                 <SelectItem key={contact.id} value={contact.id}>
-                                                    {contact.first_name} {contact.last_name}
+                                                    {contact.firstName} {contact.lastName}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

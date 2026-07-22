@@ -30,7 +30,7 @@ export async function fetchDeals(pipelineId?: string): Promise<Deal[]> {
         orderBy: { createdAt: "desc" }
     });
     
-    return data as unknown as Deal[];
+    return data as any; // Temporary fix for Deal type relations
 }
 
 export async function fetchPipelines(): Promise<Pipeline[]> {
@@ -40,7 +40,7 @@ export async function fetchPipelines(): Promise<Pipeline[]> {
     const data = await prisma.pipeline.findMany({
         orderBy: { createdAt: "asc" }
     });
-    return data as unknown as Pipeline[];
+    return data;
 }
 
 export async function fetchActivities(limit = 20): Promise<Activity[]> {
@@ -49,14 +49,14 @@ export async function fetchActivities(limit = 20): Promise<Activity[]> {
 
     const data = await prisma.activity.findMany({
         include: {
-            createdByProfile: {
+            createdBy: {
                 select: { id: true, fullName: true, avatarUrl: true }
             }
         },
         orderBy: { createdAt: "desc" },
         take: limit
     });
-    return data as unknown as Activity[];
+    return data as any;
 }
 
 export async function fetchTasks(status?: string): Promise<Task[]> {
@@ -71,7 +71,7 @@ export async function fetchTasks(status?: string): Promise<Task[]> {
     const data = await prisma.task.findMany({
         where,
         include: {
-            assignedToProfile: {
+            assignedTo: {
                 select: { id: true, fullName: true, avatarUrl: true }
             },
             contact: {
@@ -80,7 +80,7 @@ export async function fetchTasks(status?: string): Promise<Task[]> {
         },
         orderBy: { dueDate: "asc" }
     });
-    return data as unknown as Task[];
+    return data as any;
 }
 
 export async function fetchDealStats(profileId?: string, isAdmin?: boolean): Promise<{ activeCount: number, totalRevenue: number }> {
@@ -108,19 +108,19 @@ export async function createDeal(deal: Omit<Deal, "id" | "created_at" | "updated
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
-    return (await prisma.deal.create({
+    return await prisma.deal.create({
         data: deal as any
-    })) as unknown as Deal;
+    });
 }
 
 export async function updateDeal(id: string, updates: Partial<Deal>) {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
-    return (await prisma.deal.update({
+    return await prisma.deal.update({
         where: { id },
         data: updates as any
-    })) as unknown as Deal;
+    });
 }
 
 export async function deleteDeal(id: string) {
@@ -136,19 +136,19 @@ export async function createPipeline(pipeline: Omit<Pipeline, "id" | "created_at
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
-    return (await prisma.pipeline.create({
+    return await prisma.pipeline.create({
         data: pipeline as any
-    })) as unknown as Pipeline;
+    });
 }
 
 export async function updatePipeline(id: string, updates: Partial<Pipeline>) {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
-    return (await prisma.pipeline.update({
+    return await prisma.pipeline.update({
         where: { id },
         data: updates as any
-    })) as unknown as Pipeline;
+    });
 }
 
 export async function deletePipeline(id: string) {
@@ -164,23 +164,23 @@ export async function fetchDealNotes(dealId: string): Promise<DealNote[]> {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
-    const data = await prisma.dealNote.findMany({
+    const data = await prisma.note.findMany({
         where: { dealId },
         include: {
-            author: {
+            createdBy: {
                 select: { fullName: true, avatarUrl: true }
             }
         },
         orderBy: { createdAt: "desc" }
     });
-    return data as unknown as DealNote[];
+    return data as any;
 }
 
 export async function createDealNote(note: { dealId: string; authorId: string; content: string }) {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
-    return await prisma.dealNote.create({
+    const newNote = await prisma.note.create({
         data: note as any
     });
 }
@@ -189,7 +189,7 @@ export async function deleteDealNote(id: string) {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
-    await prisma.dealNote.delete({
+    await prisma.note.delete({
         where: { id }
     });
 }

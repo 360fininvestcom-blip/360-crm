@@ -42,7 +42,7 @@ export function StatusManagementDialog({
 
         try {
             await createStatus({
-                organization_id: organizationId,
+                organizationId: organizationId,
                 name: newStatusLabel.toLowerCase().replace(/\s+/g, "_"),
                 label: newStatusLabel,
                 color: "gray",

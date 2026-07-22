@@ -1,108 +1,61 @@
 // Core Entity Types for NanoSol CRM
 
-// User & Organization
-export interface Organization {
-    id: string;
-    name: string;
-    slug: string; // subdomain
-    logo_url?: string;
-    primary_color?: string;
-    secondary_color?: string;
-    created_at: string;
-    updated_at: string;
-}
+import type {
+    Organization,
+    Profile,
+    ContactStatus,
+    Pipeline,
+    Activity,
+    CalendarEvent,
+    SipProfile as SIPProfile,
+    SmtpConfig as SMTPConfig,
+    EmailTemplate,
+    EmailSequence,
+    SequenceEnrollment,
+    AutomationRule,
+    Contact as PrismaContact,
+    Deal as PrismaDeal,
+    Task as PrismaTask,
+    Note as PrismaDealNote
+} from "@prisma/client";
 
-export interface Profile {
-    id: string;
-    user_id: string;
-    organization_id: string;
-    email: string;
-    full_name: string;
-    avatar_url?: string;
-    role: "admin" | "manager" | "agent" | "viewer";
-    phone?: string;
-    notification_preferences?: Record<string, boolean>;
-    created_at: string;
-    updated_at: string;
-}
+// Re-export exact Prisma models for the ones that don't need relation joins
+export type {
+    Organization,
+    Profile,
+    ContactStatus,
+    Pipeline,
+    Activity,
+    CalendarEvent,
+    SIPProfile,
+    SMTPConfig,
+    EmailTemplate,
+    EmailSequence,
+    SequenceEnrollment,
+    AutomationRule
+};
 
-// CRM Entities
-export interface Contact {
-    id: string;
-    organization_id: string;
-    first_name: string;
-    last_name?: string | null;
-    email?: string | null;
-    phone?: string | null;
-    company?: string | null;
-    job_title?: string | null;
-    tags: string[];
-    custom_fields?: Record<string, unknown>;
-    lead_score?: number | null;
-    status?: string | null;
-    source?: string | null;
-    owner_id?: string | null;
-    last_call_status?: string | null;
-    last_call_at?: string | null;
-    created_at: string;
-    updated_at: string;
-}
+// Types with joined relations
+export type Contact = PrismaContact & {
+    // any joined relations can go here if needed in the future
+};
 
-export interface ContactStatus {
-    id: string;
-    organization_id: string;
-    name: string;
-    label: string;
-    color?: string;
-    order: number;
-    created_at: string;
-}
+export type Deal = PrismaDeal & {
+    contact?: Partial<PrismaContact> | null;
+};
 
-export interface Deal {
-    id: string;
-    organization_id: string;
-    contact_id?: string | null;
-    name: string;
-    value: number;
-    currency: string;
-    stage: string;
-    pipeline_id: string;
-    probability: number;
-    expected_close_date?: string | null;
-    owner_id?: string | null;
-    created_at: string;
-    updated_at: string;
-    // Joined relations
-    contact?: {
-        id: string;
-        first_name: string;
-        last_name?: string | null;
-        email?: string | null;
-        phone?: string | null;
-        company?: string | null;
-    } | null;
-}
+export type Task = PrismaTask & {
+    assignedTo?: Partial<Profile> | null;
+    contact?: Partial<PrismaContact> | null;
+    deal?: Partial<PrismaDeal> | null;
+};
 
-export interface DealNote {
-    id: string;
-    deal_id: string;
-    author_id: string;
-    content: string;
-    created_at: string;
-    updated_at: string;
+export type DealNote = PrismaDealNote & {
     author?: {
-        full_name: string;
-        avatar_url?: string;
+        fullName: string | null;
+        avatarUrl: string | null;
     };
-}
-
-export interface Pipeline {
-    id: string;
-    organization_id: string;
-    name: string;
-    stages: PipelineStage[];
-    created_at: string;
-}
+};
 
 export interface PipelineStage {
     id: string;
@@ -111,7 +64,7 @@ export interface PipelineStage {
     color?: string;
 }
 
-// Activities & Timeline
+// Activity Type (Prisma Activity has type String, but UI expects specific strings)
 export type ActivityType =
     | "call"
     | "email"
@@ -122,38 +75,8 @@ export type ActivityType =
     | "file_upload"
     | "system";
 
-export interface Activity {
-    id: string;
-    organization_id: string;
-    contact_id?: string;
-    deal_id?: string;
-    type: ActivityType;
-    title: string;
-    description?: string;
-    metadata?: Record<string, unknown>;
-    created_by?: string;
-    created_at: string;
-}
-
-// Tasks & Events
-export interface Task {
-    id: string;
-    created_at: string;
-    title: string;
-    description: string | null;
-    status: "pending" | "in_progress" | "completed";
-    priority: "low" | "medium" | "high";
-    due_date: string | null;
-    assigned_to_id: string | null;
-    contact_id: string | null;
-    deal_id: string | null;
-    organization_id: string;
-    position?: number;
-    // Relations
-    assigned_to?: Profile;
-    contact?: Contact;
-    deal?: Deal;
-}
+// Manual Definitions for entities not yet migrated to Prisma Schema 
+// (Fetched via $queryRaw, returning snake_case)
 
 export interface WebForm {
     id: string;
@@ -165,68 +88,6 @@ export interface WebForm {
     config: Record<string, string>;
     created_at: string;
 }
-
-export interface CalendarEvent {
-    id: string;
-    organization_id: string;
-    title: string;
-    description?: string;
-    start_time: string;
-    end_time: string;
-    all_day: boolean;
-    contact_id?: string;
-    deal_id?: string;
-    created_by: string;
-    created_at: string;
-}
-
-// Communication
-export interface SIPProfile {
-    id: string;
-    organization_id: string;
-    user_id: string;
-    name: string;  // Account display name (e.g., "Work SIP", "Personal")
-    display_name: string;  // Caller ID display name
-    sip_username: string;
-    sip_domain: string;
-    outbound_proxy?: string;
-    registrar_server?: string;
-    websocket_server?: string; // WebSocket server URL (e.g., wss://sip.provider.com:8089/ws)
-    janus_url?: string; // Janus Gateway WSS URL
-    janus_secret?: string; // Janus API secret
-    sip_auth_user?: string; // Authorization username
-    sip_protocol?: string; // Connection protocol (wss, ws)
-    engine?: "janus" | "crococall" | "jssip"; // WebRTC/SIP engine
-    sip_password_encrypted?: string; // Stored encrypted in DB
-    is_default: boolean;  // Primary account for this user
-    is_active: boolean;
-    created_at: string;
-    updated_at?: string;
-}
-
-export interface SMTPConfig {
-    id: string;
-    organization_id: string;
-    user_id?: string;
-    name?: string;
-    from_name?: string;
-    email_addr: string;
-    smtp_host: string;
-    smtp_port: number;
-    smtp_user: string;
-    smtp_pass_encrypted?: string;
-    use_tls: boolean;
-    imap_host?: string;
-    imap_port?: number;
-    imap_user?: string;
-    imap_pass_encrypted?: string;
-    is_org_wide: boolean;
-    is_active: boolean;
-    last_sync_at?: string;
-    created_at: string;
-    updated_at: string;
-}
-
 
 export interface Email {
     id: string;
@@ -259,70 +120,23 @@ export interface EmailTrackingEvent {
     created_at: string;
 }
 
-export interface EmailTemplate {
-    id: string;
-    organization_id: string;
-    name: string;
-    subject: string;
-    body_html: string;
-    body_text?: string;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface EmailSequence {
-    id: string;
-    organization_id: string;
-    name: string;
-    steps: EmailSequenceStep[];
-    is_active: boolean;
-    smtp_config_id?: string;
-    enrolled_count?: number; // Optional analytics
-    open_rate?: number;     // Optional analytics
-    created_at: string;
-    updated_at: string;
-}
-
 export interface EmailSequenceStep {
     id: string;
     order: number;
-    delay_days: number; // Duration value
-    delay_unit?: 'minutes' | 'hours' | 'days'; // Duration unit (default: days)
+    delay_days: number;
+    delay_unit?: 'minutes' | 'hours' | 'days';
     template_id: string;
     subject_override?: string;
 }
 
-export interface SequenceEnrollment {
-    id: string;
-    organization_id: string;
-    sequence_id: string;
-    contact_id: string;
-    status: "active" | "paused" | "completed" | "replied";
-    current_step: number;
-    next_send_at?: string;
-    created_at: string;
-    updated_at: string;
-    // Joined relations
-    contact?: {
-        id: string;
-        first_name: string;
-        last_name?: string | null;
-        email?: string | null;
-    } | null;
-    sequence?: {
-        id: string;
-        name: string;
-    } | null;
-}
-
-// Automation
+// Automation (Raw tables)
 export interface Workflow {
     id: string;
     organization_id: string;
     name: string;
     description?: string;
-    nodes: unknown[]; // React Flow nodes
-    edges: unknown[]; // React Flow edges
+    nodes: unknown[]; 
+    edges: unknown[]; 
     is_active: boolean;
     created_by?: string;
     created_at: string;
@@ -341,17 +155,6 @@ export interface WorkflowRun {
     created_at: string;
 }
 
-export interface AutomationRule {
-    id: string;
-    organization_id: string;
-    name: string;
-    trigger_type: string;
-    trigger_config: Record<string, unknown>;
-    actions: AutomationAction[];
-    is_active: boolean;
-    created_at: string;
-}
-
 export interface AutomationAction {
     id: string;
     type: string;
@@ -359,7 +162,7 @@ export interface AutomationAction {
     order: number;
 }
 
-// Call Logs
+// Call Logs (Raw table)
 export interface CallLog {
     id: string;
     organization_id: string;
@@ -375,7 +178,6 @@ export interface CallLog {
     started_at: string;
     ended_at?: string;
     created_at: string;
-    // Joined relations
     contact?: {
         id: string;
         first_name: string;
@@ -401,12 +203,12 @@ export interface APIKeys {
 
 export interface UserIntegration {
     id: string;
-    user_id: string;
-    organization_id: string;
+    userId: string;
+    organizationId: string;
     provider: "google" | "outlook";
-    external_email?: string;
-    expires_at?: string;
-    metadata?: Record<string, unknown>;
-    created_at: string;
-    updated_at: string;
+    externalEmail?: string | null;
+    expiresAt?: Date | string | null;
+    metadata?: Record<string, unknown> | null;
+    createdAt: Date | string;
+    updatedAt: Date | string;
 }

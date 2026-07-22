@@ -31,9 +31,9 @@ export async function fetchContacts(): Promise<Contact[]> {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
     
-    return (await prisma.contact.findMany({
+    return await prisma.contact.findMany({
         orderBy: { createdAt: "desc" }
-    })) as unknown as Contact[];
+    });
 }
 
 export async function fetchContactsPaginated(params: PaginationParams): Promise<PaginatedResult<Contact>> {
@@ -73,7 +73,7 @@ export async function fetchContactsPaginated(params: PaginationParams): Promise<
     ]);
 
     return {
-        data: data as unknown as Contact[],
+        data,
         total,
         page,
         limit,
@@ -88,7 +88,7 @@ export async function fetchContactByPhone(phone: string): Promise<Contact | null
     const contact = await prisma.contact.findFirst({
         where: { phone }
     });
-    return (contact as unknown as Contact) || null;
+    return contact;
 }
 
 export async function fetchContactStatuses(): Promise<ContactStatus[]> {
@@ -98,7 +98,7 @@ export async function fetchContactStatuses(): Promise<ContactStatus[]> {
     const data = await prisma.contactStatus.findMany({
         orderBy: { order: "asc" }
     });
-    return data as unknown as ContactStatus[];
+    return data;
 }
 
 export async function fetchContactCount(profileId?: string, isAdmin?: boolean): Promise<number> {
@@ -117,10 +117,10 @@ export async function updateContact(id: string, updates: Partial<Contact>) {
     if (!session?.user) throw new Error("Unauthorized");
 
     // Remove any undefined or non-database fields if needed
-    return (await prisma.contact.update({
+    return await prisma.contact.update({
         where: { id },
         data: updates as any
-    })) as unknown as Contact;
+    });
 }
 
 export async function deleteContact(id: string) {
@@ -141,7 +141,7 @@ export async function bulkDeleteContacts(ids: string[]) {
     });
 }
 
-export async function bulkCreateContacts(contacts: Omit<Contact, "id" | "created_at" | "updated_at">[]) {
+export async function bulkCreateContacts(contacts: Omit<Contact, "id" | "createdAt" | "updatedAt">[]) {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
@@ -154,13 +154,13 @@ export async function bulkCreateContacts(contacts: Omit<Contact, "id" | "created
     return contacts;
 }
 
-export async function createContactStatus(status: Omit<ContactStatus, "id" | "created_at">) {
+export async function createContactStatus(status: Omit<ContactStatus, "id" | "createdAt">) {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");
 
-    return (await prisma.contactStatus.create({
+    return await prisma.contactStatus.create({
         data: status as any
-    })) as unknown as ContactStatus;
+    });
 }
 
 export async function deleteContactStatus(id: string) {

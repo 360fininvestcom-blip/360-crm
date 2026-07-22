@@ -40,8 +40,11 @@ export interface AnalyticsData {
 export async function fetchAnalytics(ownerId?: string, days: number = 7, pipelineId?: string): Promise<AnalyticsData> {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
     
-    const orgId = session.user.organizationId;
+    const orgId = organizationId;
     const today = new Date();
     const startDate = subDays(today, days - 1);
 

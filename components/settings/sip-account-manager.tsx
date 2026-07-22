@@ -75,7 +75,7 @@ export function SipAccountManager({ userId, orgId }: SipAccountManagerProps) {
     const handleSetDefault = async (account: SIPProfile) => {
         try {
             await setDefault({ id: account.id, userId });
-            toast.success(`${account.name} is now your default SIP account`);
+            toast.success(`${account.displayName} is now your default SIP account`);
             // Refresh accounts list
             mutate(`sip-accounts-${userId}`);
         } catch (error: unknown) {
@@ -137,8 +137,8 @@ export function SipAccountManager({ userId, orgId }: SipAccountManagerProps) {
                                         <TableCell className="font-medium">
                                             <div className="flex flex-col">
                                                 <div className="flex items-center gap-2">
-                                                    <span>{account.name || "SIP Account"}</span>
-                                                    {account.is_default && (
+                                                    <span>{account.displayName || "SIP Account"}</span>
+                                                    {account.isDefault && (
                                                         <Badge variant="secondary" className="gap-1 text-xs">
                                                             <Star className="h-3 w-3" />
                                                             Default
@@ -146,22 +146,22 @@ export function SipAccountManager({ userId, orgId }: SipAccountManagerProps) {
                                                     )}
                                                 </div>
                                                 <span className="text-xs text-muted-foreground">
-                                                    {account.display_name}
+                                                    {account.displayName}
                                                 </span>
                                             </div>
                                         </TableCell>
-                                        <TableCell>{account.sip_username}</TableCell>
+                                        <TableCell>{account.sipUsername}</TableCell>
                                         <TableCell className="text-muted-foreground text-sm">
-                                            {account.sip_domain}
+                                            {account.sipDomain}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={account.is_active ? "default" : "destructive"}>
-                                                {account.is_active ? "Active" : "Inactive"}
+                                            <Badge variant={account.isActive ? "default" : "destructive"}>
+                                                {account.isActive ? "Active" : "Inactive"}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
-                                                {!account.is_default && (
+                                                {!account.isDefault && (
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -212,7 +212,7 @@ export function SipAccountManager({ userId, orgId }: SipAccountManagerProps) {
                     <DialogHeader>
                         <DialogTitle>Delete SIP Account?</DialogTitle>
                         <DialogDescription>
-                            This will permanently delete the SIP account <strong>&quot;{accountToDelete?.name}&quot;</strong>.
+                            This will permanently delete the SIP account <strong>&quot;{accountToDelete?.displayName}&quot;</strong>.
                             You will not be able to make calls using this account.
                         </DialogDescription>
                     </DialogHeader>

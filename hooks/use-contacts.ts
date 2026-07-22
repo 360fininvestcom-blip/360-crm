@@ -21,11 +21,13 @@ import {
     PaginatedResult
 } from "@/app/actions/contacts";
 
+export type { PaginationParams, PaginatedResult };
+
 // ============================================
 // DEFAULT STATUSES
 // ============================================
 
-const DEFAULT_STATUSES: Omit<ContactStatus, "id" | "organization_id" | "created_at">[] = [
+const DEFAULT_STATUSES: Omit<ContactStatus, "id" | "organizationId" | "createdAt">[] = [
     { name: "new", label: "New", color: "gray", order: 1 },
     { name: "no_answer", label: "No Answer", color: "orange", order: 2 },
     { name: "reassign", label: "Reassign", color: "orange", order: 3 },
@@ -49,8 +51,8 @@ async function fetchContactStatusesWithFallback() {
     return DEFAULT_STATUSES.map((s, i) => ({
         ...s,
         id: `default-${i}`,
-        organization_id: "default",
-        created_at: new Date().toISOString()
+        organizationId: "default",
+        createdAt: new Date()
     })) as ContactStatus[];
 }
 
@@ -76,9 +78,7 @@ export function useContacts() {
     return swr;
 }
 
-/**
- * Fetch contacts with pagination and search
- */
+
 export function useContactsPaginated(params: PaginationParams = {}) {
     const key = `contacts-paginated-${JSON.stringify(params)}`;
     return useSWR<PaginatedResult<Contact>>(
@@ -124,7 +124,7 @@ export function useContactCount(profileId?: string, isAdmin?: boolean) {
 export function useCreateContact() {
     return useSWRMutation(
         "contacts",
-        async (_, { arg }: { arg: Omit<Contact, "id" | "created_at" | "updated_at"> }) => {
+        async (_, { arg }: { arg: Omit<Contact, "id" | "createdAt" | "updatedAt"> }) => {
             const res = await fetch('/api/internal/contacts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -192,7 +192,7 @@ export function useBulkDeleteContacts() {
 export function useBulkCreateContacts() {
     return useSWRMutation(
         "contacts",
-        async (_, { arg }: { arg: Omit<Contact, "id" | "created_at" | "updated_at">[] }) => {
+        async (_, { arg }: { arg: Omit<Contact, "id" | "createdAt" | "updatedAt">[] }) => {
             return await bulkCreateContacts(arg);
         },
         {
@@ -204,7 +204,7 @@ export function useBulkCreateContacts() {
 export function useCreateContactStatus() {
     return useSWRMutation(
         "contact-statuses",
-        async (_, { arg }: { arg: Omit<ContactStatus, "id" | "created_at"> }) => {
+        async (_, { arg }: { arg: Omit<ContactStatus, "id" | "createdAt"> }) => {
             return await createContactStatus(arg);
         },
         {

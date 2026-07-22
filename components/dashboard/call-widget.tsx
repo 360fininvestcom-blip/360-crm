@@ -211,8 +211,8 @@ export function CallWidget() {
                 id: contact.id,
                 updates: {
                     status: status === "answered" ? "contacted" : contact.status,
-                    last_call_at: new Date().toISOString(),
-                    last_call_status: status
+                    lastCallAt: new Date() as any,
+                    lastCallStatus: status
                 }
             });
         }
@@ -226,7 +226,7 @@ export function CallWidget() {
         createCallLog({
             contact_id: contact?.id || undefined,
             user_id: profile.id,
-            organization_id: profile.organization_id,
+            organization_id: profile.organizationId!,
             phone_number: currentNumber,
             direction: "outbound",
             status: logStatus,
@@ -390,8 +390,8 @@ export function CallWidget() {
                                 {isInCall ? (
                                     <ActiveCall
                                         contact={contact ? {
-                                            first_name: contact.first_name,
-                                            last_name: contact.last_name ?? "",
+                                            firstName: contact.firstName,
+                                            lastName: contact.lastName ?? "",
                                             company: contact.company ?? ""
                                         } : null}
                                         status={callStatus}
@@ -462,7 +462,7 @@ export function CallWidget() {
                                                                     "h-1.5 w-1.5 rounded-full",
                                                                     (typeof window !== "undefined" ? window.__SIP_SERVICE__?.isRegistered(acc.id) : false) ? "bg-green-500" : "bg-muted-foreground/30"
                                                                 )} />
-                                                                <span className="text-sm font-medium">{acc.name || acc.sip_username}</span>
+                                                                <span className="text-sm font-medium">{acc.displayName || acc.sipUsername}</span>
                                                             </div>
                                                         </SelectItem>
                                                     ))}
@@ -487,8 +487,8 @@ export function CallWidget() {
                                                 onSearchChange={setSearchQuery}
                                                 searchResults={(searchResults?.data || []).map(c => ({
                                                     id: c.id,
-                                                    first_name: c.first_name,
-                                                    last_name: c.last_name ?? "",
+                                                    firstName: c.firstName,
+                                                    lastName: c.lastName ?? "",
                                                     phone: c.phone ?? "",
                                                     company: c.company ?? ""
                                                 }))}

@@ -114,32 +114,22 @@ export function EmailAccountManager({ orgId }: EmailAccountManagerProps) {
                                     <TableRow key={account.id}>
                                         <TableCell className="font-medium">
                                             <div className="flex flex-col">
-                                                <span>{account.name || "Default"}</span>
-                                                {account.imap_host && (
-                                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Sync Enabled</span>
-                                                )}
+                                                <span>{account.fromName || account.fromEmail}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell>{account.email_addr}</TableCell>
+                                        <TableCell>{account.fromEmail}</TableCell>
                                         <TableCell className="text-muted-foreground text-sm">
-                                            {account.smtp_host}:{account.smtp_port}
+                                            {account.host}:{account.port}
                                         </TableCell>
                                         <TableCell>
-                                            {account.is_org_wide ? (
-                                                <Badge variant="secondary" className="gap-1">
-                                                    <ShieldCheck className="h-3 w-3" />
-                                                    Shared
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="outline" className="gap-1">
-                                                    <User className="h-3 w-3" />
-                                                    Personal
-                                                </Badge>
-                                            )}
+                                            <Badge variant="secondary" className="gap-1">
+                                                <ShieldCheck className="h-3 w-3" />
+                                                Org Wide
+                                            </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={account.is_active ? "default" : "destructive"}>
-                                                {account.is_active ? "Active" : "Inactive"}
+                                            <Badge variant="default">
+                                                Active
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -183,7 +173,7 @@ export function EmailAccountManager({ orgId }: EmailAccountManagerProps) {
                     <DialogHeader>
                         <DialogTitle>Are you absolutely sure?</DialogTitle>
                         <DialogDescription>
-                            This will permanently delete the email account **{accountToDelete?.email_addr}**.
+                            Are you sure you want to delete the email account <span className="font-semibold">{accountToDelete?.fromEmail}</span>?
                             Any scheduled emails or sequences relying on this account may fail.
                         </DialogDescription>
                     </DialogHeader>

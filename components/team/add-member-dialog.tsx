@@ -47,7 +47,7 @@ export function AddMemberDialog({
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!activeProfile?.organization_id) {
+        if (!activeProfile?.organizationId) {
             toast.error("Organization ID not found");
             return;
         }
@@ -69,7 +69,7 @@ export function AddMemberDialog({
                     full_name: fullName,
                     role,
                     phone,
-                    organization_id: activeProfile.organization_id,
+                    organizationId: activeProfile?.organizationId || "",
                 }),
             });
 

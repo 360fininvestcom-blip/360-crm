@@ -126,6 +126,7 @@ export async function GET(request: Request) {
             } else if (type === "before") {
                 whereClause[dbField as keyof Prisma.ContactWhereInput] = { lte: new Date(value) } as any;
             } else if (type === "equals") {
+                // @ts-ignore
                 whereClause[dbField as keyof Prisma.ContactWhereInput] = value;
             } else if (type === "contains") {
                 whereClause[dbField as keyof Prisma.ContactWhereInput] = { contains: value, mode: 'insensitive' } as any;

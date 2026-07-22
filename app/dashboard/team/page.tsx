@@ -62,7 +62,7 @@ export default function TeamPage() {
     }
 
     const filteredProfiles = profiles?.filter(p =>
-        p.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -167,13 +167,13 @@ export default function TeamPage() {
                             >
                                 <div className="flex items-center gap-4">
                                     <Avatar className="h-10 w-10">
-                                        <AvatarImage src={profile.avatar_url} />
+                                        <AvatarImage src={profile.avatarUrl || undefined} />
                                         <AvatarFallback>
                                             <User className="h-5 w-5" />
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <p className="font-medium">{profile.full_name || "New User"}</p>
+                                        <p className="font-medium">{profile.fullName || "New User"}</p>
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                             <Mail className="h-3 w-3" />
                                             {profile.email}

@@ -38,12 +38,12 @@ export default function ActivitiesPage() {
     const pageSize = 20;
 
     useEffect(() => {
-        if (!profile?.organization_id) return;
+        if (!profile?.organizationId) return;
         const fetch = async () => {
             await fetchActivities();
         };
         fetch();
-    }, [profile?.organization_id, typeFilter]);
+    }, [profile?.organizationId, typeFilter]);
 
     async function fetchActivities() {
         setLoading(true);

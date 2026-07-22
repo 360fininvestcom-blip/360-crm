@@ -11,8 +11,8 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 interface Contact {
-    first_name: string;
-    last_name?: string | null;
+    firstName: string;
+    lastName?: string | null;
     company?: string | null;
 }
 
@@ -116,7 +116,7 @@ export const ActiveCall = ({
             </div>
 
             <div className="text-center">
-                <p className="text-xl font-bold">{contact?.first_name || "Unknown"} {contact?.last_name || ""}</p>
+                <h3 className="font-semibold text-lg">{contact?.firstName || "Unknown"} {contact?.lastName || ""}</h3>
                 <p className="text-sm text-muted-foreground">{contact?.company || "Outbound Call"}</p>
                 <div className="mt-2 flex items-center justify-center gap-2">
                     <span className={cn(

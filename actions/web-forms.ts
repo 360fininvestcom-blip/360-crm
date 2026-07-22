@@ -8,10 +8,13 @@ import { Prisma } from "@prisma/client";
 export async function getWebForms() {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const forms = await prisma.$queryRaw`
         SELECT * FROM web_forms
-        WHERE organization_id = CAST(${session.user.organizationId} AS UUID)
+        WHERE organization_id = CAST(${organizationId} AS UUID)
         ORDER BY created_at DESC
     `;
     
@@ -21,6 +24,9 @@ export async function getWebForms() {
 export async function createWebForm(name: string, source: string, overrides: Record<string, any> = {}) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     const config = { email: "email", name: "first_name" };
 
@@ -31,7 +37,7 @@ export async function createWebForm(name: string, source: string, overrides: Rec
     const result = await prisma.$queryRaw`
         INSERT INTO web_forms (organization_id, name, source, status, config, description, submit_button_text, success_message)
         VALUES (
-            CAST(${session.user.organizationId} AS UUID),
+            CAST(${organizationId} AS UUID),
             ${name},
             ${source},
             'active',
@@ -50,6 +56,9 @@ export async function createWebForm(name: string, source: string, overrides: Rec
 export async function updateWebForm(id: string, payload: Record<string, any>) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     // Dynamic update is tricky with queryRaw, but we only have a few fields
     const name = payload.name;
@@ -65,7 +74,7 @@ export async function updateWebForm(id: string, payload: Record<string, any>) {
             submit_button_text = ${submitText},
             success_message = ${successMsg}
         WHERE id = CAST(${id} AS UUID)
-        AND organization_id = CAST(${session.user.organizationId} AS UUID)
+        AND organization_id = CAST(${organizationId} AS UUID)
         RETURNING *
     `;
 
@@ -76,10 +85,13 @@ export async function updateWebForm(id: string, payload: Record<string, any>) {
 export async function deleteWebForm(id: string) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
+    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
+    if (!profile) throw new Error("No active profile");
+    const organizationId = profile.organizationId;
 
     await prisma.$executeRaw`
         DELETE FROM web_forms
         WHERE id = CAST(${id} AS UUID)
-        AND organization_id = CAST(${session.user.organizationId} AS UUID)
+        AND organization_id = CAST(${organizationId} AS UUID)
     `;
 }

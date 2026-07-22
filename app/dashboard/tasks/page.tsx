@@ -192,26 +192,26 @@ export default function TasksPage() {
                                                         </p>
                                                     )}
                                                     <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                                                        {task.due_date && (
-                                                            <div className={cn("flex items-center gap-1", new Date(task.due_date) < new Date() && task.status !== "completed" ? "text-red-500 font-medium" : "")}>
+                                                        {task.dueDate && (
+                                                            <div className={cn("flex items-center gap-1", new Date(task.dueDate) < new Date() && task.status !== "completed" ? "text-red-500 font-medium" : "")}>
                                                                 <CalendarIcon className="h-3 w-3" />
-                                                                {format(new Date(task.due_date), "MMM d, yyyy")}
+                                                                {format(new Date(task.dueDate), "MMM d, yyyy")}
                                                             </div>
                                                         )}
-                                                        {task.assigned_to && (
+                                                        {task.assignedTo && (
                                                             <div className="flex items-center gap-1">
                                                                 <Avatar className="h-4 w-4">
-                                                                    <AvatarImage src={task.assigned_to.avatar_url} />
+                                                                    <AvatarImage src={task.assignedTo.avatarUrl || undefined} />
                                                                     <AvatarFallback className="text-[9px]">
-                                                                        {task.assigned_to.full_name?.[0]}
+                                                                        {task.assignedTo.fullName?.[0]}
                                                                     </AvatarFallback>
                                                                 </Avatar>
-                                                                <span>{task.assigned_to.full_name}</span>
+                                                                <span>{task.assignedTo.fullName}</span>
                                                             </div>
                                                         )}
                                                         {task.contact && (
                                                             <div className="flex items-center gap-1 text-primary/80">
-                                                                <span>@ {task.contact.first_name} {task.contact.last_name}</span>
+                                                                <span>@ {task.contact.firstName} {task.contact.lastName}</span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -249,7 +249,7 @@ export default function TasksPage() {
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
                 task={selectedTask}
-                organizationId={profile?.organization_id || ""}
+                organizationId={profile?.organizationId || ""}
             />
         </div>
     );

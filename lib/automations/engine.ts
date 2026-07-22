@@ -200,8 +200,8 @@ async function executeEmailAction(run: WorkflowRun, node: RFNode) {
         templateId,
         organizationId: run.organization_id,
         variables: {
-            first_name: contact.first_name,
-            last_name: contact.last_name || ''
+            firstName: contact.firstName,
+            lastName: contact.lastName || ''
         }
     });
 }

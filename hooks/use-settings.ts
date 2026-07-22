@@ -135,9 +135,10 @@ export function useSetDefaultSipAccount() {
 }
 
 export function useUpdatePassword() {
-    return useSWRMutation("auth-password", async (_, { arg }: { arg: string }) => {
+    return useSWRMutation("auth-password", async (_, { arg }: { arg: { newPassword: string; currentPassword: string } }) => {
         const { data, error } = await authClient.changePassword({
-            newPassword: arg,
+            newPassword: arg.newPassword,
+            currentPassword: arg.currentPassword,
             revokeOtherSessions: true
         });
         if (error) throw error;

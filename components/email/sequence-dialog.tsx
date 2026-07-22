@@ -37,17 +37,17 @@ import type { EmailSequence } from "@/types";
 const stepSchema = z.object({
     id: z.string().optional(),
     order: z.number(),
-    delay_days: z.number().min(0, "Delay must be at least 0"),
-    delay_unit: z.enum(["minutes", "hours", "days"]).default("days"),
-    template_id: z.string().min(1, "Template is required"),
-    subject_override: z.string().optional().nullable(),
+    delayDays: z.number().min(0, "Delay must be at least 0"),
+    delayUnit: z.enum(["minutes", "hours", "days"]).default("days"),
+    templateId: z.string().min(1, "Template is required"),
+    subjectOverride: z.string().optional().nullable(),
 });
 
 const formSchema = z.object({
     name: z.string().min(1, "Sequence name is required"),
-    smtp_config_id: z.string().min(1, "Outbound email account is required"),
+    smtpConfigId: z.string().min(1, "Outbound email account is required"),
     steps: z.array(stepSchema).min(1, "At least one step is required"),
-    is_active: z.boolean().default(true),
+    isActive: z.boolean().default(true),
 });
 
 interface SequenceDialogProps {
@@ -71,12 +71,12 @@ export function SequenceDialog({
     const { trigger: updateSequence, isMutating: isUpdating } = useUpdateEmailSequence();
 
     const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
+        resolver: zodResolver(formSchema) as any,
         defaultValues: {
             name: "",
-            smtp_config_id: "",
-            steps: [{ order: 1, delay_days: 1, delay_unit: "days", template_id: "" }],
-            is_active: true,
+            smtpConfigId: "",
+            steps: [{ order: 1, delayDays: 1, delayUnit: "days", templateId: "" }],
+            isActive: true,
         },
     });
 
@@ -89,20 +89,20 @@ export function SequenceDialog({
         if (sequence) {
             form.reset({
                 name: sequence.name,
-                smtp_config_id: sequence.smtp_config_id || "",
-                steps: sequence.steps.map(s => ({
+                smtpConfigId: (sequence as any).smtpConfigId || "",
+                steps: ((sequence.steps as any) || []).map((s: any) => ({
                     ...s,
-                    delay_unit: s.delay_unit || "days", // Backwards compatibility
-                    subject_override: s.subject_override || null
+                    delayUnit: s.delayUnit || "days",
+                    subjectOverride: s.subjectOverride || null
                 })),
-                is_active: sequence.is_active,
+                isActive: sequence.isActive,
             });
         } else {
             form.reset({
                 name: "",
-                smtp_config_id: "",
-                steps: [{ order: 1, delay_days: 1, delay_unit: "days", template_id: "" }],
-                is_active: true,
+                smtpConfigId: "",
+                steps: [{ order: 1, delayDays: 1, delayUnit: "days", templateId: "" }],
+                isActive: true,
             });
         }
     }, [sequence, form, open]);
@@ -114,9 +114,9 @@ export function SequenceDialog({
                 steps: values.steps.map(s => ({
                     ...s,
                     id: s.id || undefined,
-                    subject_override: s.subject_override || null
+                    subjectOverride: s.subjectOverride || null
                 }))
-            };
+            } as any;
 
             if (sequence) {
                 await updateSequence({
@@ -127,8 +127,8 @@ export function SequenceDialog({
             } else {
                 await createSequence({
                     ...sequenceData,
-                    organization_id: organizationId,
-                } as Omit<EmailSequence, "id" | "created_at" | "updated_at">);
+                    organizationId: organizationId,
+                } as Omit<EmailSequence, "id" | "createdAt" | "updatedAt">);
                 toast.success("Sequence created");
             }
             onSuccess?.();
@@ -152,7 +152,7 @@ export function SequenceDialog({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         <FormField
-                            control={form.control}
+                            control={form.control as any}
                             name="name"
                             render={({ field }) => (
                                 <FormItem>
@@ -166,8 +166,8 @@ export function SequenceDialog({
                         />
 
                         <FormField
-                            control={form.control}
-                            name="smtp_config_id"
+                            control={form.control as any}
+                            name="smtpConfigId"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Engagement Account (SMTP)</FormLabel>
@@ -183,7 +183,7 @@ export function SequenceDialog({
                                         <SelectContent>
                                             {smtpConfigs?.map((config) => (
                                                 <SelectItem key={config.id} value={config.id}>
-                                                    {config.name} ({config.email_addr})
+                                                    {config.fromName || config.username} ({config.fromEmail})
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -203,9 +203,9 @@ export function SequenceDialog({
                                     onClick={() =>
                                         append({
                                             order: fields.length + 1,
-                                            delay_days: 1,
-                                            delay_unit: "days",
-                                            template_id: "",
+                                            delayDays: 1,
+                                            delayUnit: "days",
+                                            templateId: "",
                                         })
                                     }
                                 >
@@ -238,7 +238,7 @@ export function SequenceDialog({
                                         <div className="flex gap-2">
                                             <FormField
                                                 control={form.control}
-                                                name={`steps.${index}.delay_days`}
+                                                name={`steps.${index}.delayDays`}
                                                 render={({ field }) => (
                                                     <FormItem className="flex-1">
                                                         <FormLabel className="flex items-center gap-2">
@@ -261,7 +261,7 @@ export function SequenceDialog({
                                             />
                                             <FormField
                                                 control={form.control}
-                                                name={`steps.${index}.delay_unit`}
+                                                name={`steps.${index}.delayUnit`}
                                                 render={({ field }) => (
                                                     <FormItem className="w-[100px]">
                                                         <FormLabel>&nbsp;</FormLabel>
@@ -288,7 +288,7 @@ export function SequenceDialog({
 
                                         <FormField
                                             control={form.control}
-                                            name={`steps.${index}.template_id`}
+                                            name={`steps.${index}.templateId`}
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel>Select Template</FormLabel>

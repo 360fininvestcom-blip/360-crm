@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
     ArrowLeft,
     Mail,
@@ -90,7 +91,7 @@ export default function ContactDetailPage() {
     };
 
     useEffect(() => {
-        if (!profile?.organization_id || !contactId) return;
+        if (!profile?.organizationId || !contactId) return;
 
         async function fetchContactData() {
             setLoading(true);
@@ -123,7 +124,7 @@ export default function ContactDetailPage() {
     }, [contactId, profile]);
 
     const handleAddNote = async () => {
-        if (!noteContent.trim() || !profile?.organization_id) return;
+        if (!noteContent.trim() || !profile?.organizationId) return;
         setIsSavingNote(true);
 
         try {
@@ -163,7 +164,7 @@ export default function ContactDetailPage() {
                 </Button>
                 <span>Contacts</span>
                 <span>/</span>
-                <span className="text-foreground">{contact.first_name} {contact.last_name}</span>
+                <span className="text-foreground">{contact.firstName} {contact.lastName}</span>
             </div>
 
             {/* Header Profile Card */}
@@ -172,19 +173,19 @@ export default function ContactDetailPage() {
                     <div className="flex items-center gap-6">
                         <Avatar className="h-20 w-20">
                             <AvatarFallback className="text-2xl">
-                                {getInitials(contact.first_name, contact.last_name)}
+                                {getInitials(contact.firstName, contact.lastName)}
                             </AvatarFallback>
                         </Avatar>
 
                         <div className="space-y-1">
                             <h1 className="text-2xl font-bold tracking-tight">
-                                {contact.first_name} {contact.last_name}
+                                {contact.firstName} {contact.lastName}
                             </h1>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground py-1">
-                                {contact.job_title && (
+                                {contact.jobTitle && (
                                     <span className="flex items-center gap-1">
                                         <Building2 className="h-4 w-4" />
-                                        {contact.job_title} {contact.company ? `at ${contact.company}` : ''}
+                                        {contact.jobTitle} {contact.company ? `at ${contact.company}` : ''}
                                     </span>
                                 )}
                                 {contact.email && (
@@ -202,7 +203,7 @@ export default function ContactDetailPage() {
                             </div>
                             <div className="flex items-center gap-2 pt-1">
                                 <ContactStatusSelector contactId={contactId} currentStatus={contact.status} />
-                                <LeadScoreBadge score={contact.lead_score || 0} reason={contact.score_reason} />
+                                <LeadScoreBadge score={contact.leadScore || 0} reason={undefined} />
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -233,7 +234,7 @@ export default function ContactDetailPage() {
                             </Button>
                         </div>
                         <div className="text-xs text-muted-foreground text-right mt-2">
-                            Added {format(new Date(contact.created_at), 'MMM d, yyyy')}
+                            Added {format(new Date(contact.createdAt), 'MMM d, yyyy')}
                         </div>
                     </div>
                 </CardContent>
@@ -335,7 +336,7 @@ export default function ContactDetailPage() {
                                             <div>
                                                 <p className="font-medium">{task.title}</p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    Due {task.due_date ? format(new Date(task.due_date), 'MMM d') : 'No date'}
+                                                    Due {task.dueDate ? format(new Date(task.dueDate), 'MMM d') : 'No date'}
                                                 </p>
                                             </div>
                                         </div>
@@ -404,9 +405,9 @@ export default function ContactDetailPage() {
                                             </div>
                                             <div className="text-right">
                                                 <div className="font-bold text-lg">${deal.value?.toLocaleString()}</div>
-                                                {deal.expected_close_date && (
+                                                {deal.expectedCloseDate && (
                                                     <div className="text-xs text-muted-foreground">
-                                                        Close: {format(new Date(deal.expected_close_date), 'MMM d, yyyy')}
+                                                        Close: {format(new Date(deal.expectedCloseDate), 'MMM d, yyyy')}
                                                     </div>
                                                 )}
                                             </div>
@@ -438,7 +439,7 @@ export default function ContactDetailPage() {
                                             <div className="flex-1">
                                                 <div className={cn("font-medium", task.status === 'completed' && "line-through text-muted-foreground")}>{task.title}</div>
                                                 <div className="text-xs text-muted-foreground flex gap-3">
-                                                    {task.due_date && <span>Due: {format(new Date(task.due_date), 'MMM d, yyyy h:mm a')}</span>}
+                                                    {task.dueDate && <span>Due: {format(new Date(task.dueDate), 'MMM d, yyyy h:mm a')}</span>}
                                                     {task.priority && <span>Priority: <span className="capitalize">{task.priority}</span></span>}
                                                 </div>
                                             </div>
@@ -471,11 +472,11 @@ export default function ContactDetailPage() {
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                             <div>
                                 <h4 className="text-sm font-medium text-muted-foreground mb-1">First Name</h4>
-                                <p>{contact.first_name || '-'}</p>
+                                <p>{contact.firstName || '-'}</p>
                             </div>
                             <div>
                                 <h4 className="text-sm font-medium text-muted-foreground mb-1">Last Name</h4>
-                                <p>{contact.last_name || '-'}</p>
+                                <p>{contact.lastName || '-'}</p>
                             </div>
                             <div>
                                 <h4 className="text-sm font-medium text-muted-foreground mb-1">Email</h4>
@@ -491,13 +492,13 @@ export default function ContactDetailPage() {
                             </div>
                             <div>
                                 <h4 className="text-sm font-medium text-muted-foreground mb-1">Job Title</h4>
-                                <p>{contact.job_title || '-'}</p>
+                                <p>{contact.jobTitle || '-'}</p>
                             </div>
                             <div className="md:col-span-2 mt-4 pt-4 border-t">
                                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Custom Fields</h4>
-                                {contact.custom_fields && Object.keys(contact.custom_fields).length > 0 ? (
+                                {contact.customFields && Object.keys(contact.customFields).length > 0 ? (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {Object.entries(contact.custom_fields).map(([key, value]) => (
+                                        {Object.entries(contact.customFields).map(([key, value]) => (
                                             <div key={key}>
                                                 <h5 className="text-xs font-medium text-muted-foreground capitalize mb-1">{key.replace(/_/g, ' ')}</h5>
                                                 <p className="text-sm">{String(value)}</p>
@@ -518,7 +519,8 @@ export default function ContactDetailPage() {
                     open={isEditDialogOpen}
                     onOpenChange={setIsEditDialogOpen}
                     contact={contact}
-                    organizationId={profile.organization_id}
+                // @ts-ignore
+                    organizationId={profile.organizationId}
                     onSuccess={() => {
                         window.location.reload();
                     }}

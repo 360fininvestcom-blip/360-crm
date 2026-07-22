@@ -104,7 +104,7 @@ export default function EmailPage() {
             const res = await fetch("/api/email/sync", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ organization_id: activeProfile?.organization_id })
+                body: JSON.stringify({ organizationId: activeProfile?.organizationId })
             });
             const result = await res.json();
             if (result.success) {
@@ -197,10 +197,10 @@ export default function EmailPage() {
         try {
             await updateSequence({
                 id: sequence.id,
-                updates: { is_active: !sequence.is_active }
+                updates: { isActive: !sequence.isActive }
             });
             mutateSequences();
-            toast.success(`Sequence ${!sequence.is_active ? "activated" : "paused"}`);
+            toast.success(`Sequence ${!sequence.isActive ? "activated" : "paused"}`);
         } catch (error) {
             console.error("Toggle failed:", error);
             toast.error("Failed to update sequence");
@@ -427,8 +427,8 @@ export default function EmailPage() {
                         <div className="space-y-1">
                             {smtpConfigs?.map(account => (
                                 <div key={account.id} className="flex items-center px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 rounded-md cursor-pointer transition-colors">
-                                    <div className={cn("h-2 w-2 rounded-full mr-2", account.is_active ? "bg-green-500" : "bg-red-500")} />
-                                    <span className="truncate">{account.email_addr}</span>
+                                    <div className={cn("h-2 w-2 rounded-full mr-2", (account as any).isActive ? "bg-green-500" : "bg-red-500")} />
+                                    <span className="truncate">{(account as any).username}</span>
                                 </div>
                             ))}
                             {smtpConfigs?.length === 0 && (
@@ -634,7 +634,7 @@ export default function EmailPage() {
                                             >
                                                 <div className={cn(
                                                     "absolute top-0 left-0 w-1 h-full transition-colors",
-                                                    sequence.is_active ? "bg-green-500" : "bg-muted"
+                                                    sequence.isActive ? "bg-green-500" : "bg-muted"
                                                 )} />
 
                                                 <CardHeader className="pb-2">
@@ -647,18 +647,18 @@ export default function EmailPage() {
                                                                 <CardTitle className="text-lg leading-none mb-1">{sequence.name}</CardTitle>
                                                                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                                                                     <Clock className="h-3 w-3" />
-                                                                    {sequence.steps?.length || 0} steps • {sequence.enrolled_count || 0} enrolled
+                                                                    {(sequence as any).steps?.length || 0} steps • {(sequence as any).enrolledCount || 0} enrolled
                                                                 </p>
                                                             </div>
                                                         </div>
                                                         <Badge
-                                                            variant={sequence.is_active ? "default" : "secondary"}
+                                                            variant={sequence.isActive ? "default" : "secondary"}
                                                             className={cn(
                                                                 "capitalize text-[10px] px-2 py-0",
-                                                                sequence.is_active ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-500/20" : ""
+                                                                sequence.isActive ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-500/20" : ""
                                                             )}
                                                         >
-                                                            {sequence.is_active ? "active" : "paused"}
+                                                            {sequence.isActive ? "active" : "paused"}
                                                         </Badge>
                                                     </div>
                                                 </CardHeader>
@@ -668,9 +668,9 @@ export default function EmailPage() {
                                                         <div className="p-3 rounded-lg bg-muted/40 border border-muted/40">
                                                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Open Rate</p>
                                                             <div className="flex items-end gap-2">
-                                                                <span className="text-xl font-bold">{sequence.open_rate || 0}%</span>
+                                                                <span className="text-xl font-bold">{(sequence as any).openRate || 0}%</span>
                                                                 <div className="flex-1 mb-1.5">
-                                                                    <Progress value={sequence.open_rate || 0} className="h-1" />
+                                                                    <Progress value={(sequence as any).openRate || 0} className="h-1" />
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -710,11 +710,11 @@ export default function EmailPage() {
                                                                 size="sm"
                                                                 className={cn(
                                                                     "h-8 px-2 text-xs",
-                                                                    sequence.is_active ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50" : "text-green-500 hover:text-green-600 hover:bg-green-50"
+                                                                    sequence.isActive ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50" : "text-green-500 hover:text-green-600 hover:bg-green-50"
                                                                 )}
                                                                 onClick={() => handleToggleSequence(sequence)}
                                                             >
-                                                                {sequence.is_active ? (
+                                                                {sequence.isActive ? (
                                                                     <><Pause className="h-3.5 w-3.5 mr-1" /> Pause</>
                                                                 ) : (
                                                                     <><Play className="h-3.5 w-3.5 mr-1" /> Resume</>
@@ -822,7 +822,7 @@ export default function EmailPage() {
                 open={templateDialogOpen}
                 onOpenChange={handleDialogClose}
                 template={selectedTemplate}
-                organizationId={activeProfile?.organization_id || ""}
+                organizationId={activeProfile?.organizationId || ""}
             />
 
             <EmailComposerDialog
@@ -832,14 +832,14 @@ export default function EmailPage() {
                     if (!open) setComposerDefaultTo("");
                 }}
                 defaultTo={composerDefaultTo}
-                organizationId={activeProfile?.organization_id || ""}
+                organizationId={activeProfile?.organizationId || ""}
             />
 
             <SequenceDialog
                 open={sequenceOpen}
                 onOpenChange={setSequenceOpen}
                 sequence={selectedSequence}
-                organizationId={activeProfile?.organization_id || ""}
+                organizationId={activeProfile?.organizationId || ""}
                 onSuccess={() => mutateSequences()}
             />
 
@@ -848,7 +848,7 @@ export default function EmailPage() {
                 onOpenChange={setEnrollmentManagerOpen}
                 sequenceId={selectedSequence?.id || ""}
                 sequenceName={selectedSequence?.name || ""}
-                organizationId={selectedSequence?.organization_id || ""}
+                organizationId={selectedSequence?.organizationId || ""}
             />
 
             {/* Email Detail Sheet */}

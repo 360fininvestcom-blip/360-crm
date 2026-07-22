@@ -91,22 +91,22 @@ export function DealNotesSheet({ open, onOpenChange, deal }: DealNotesSheetProps
                         </div>
                     ) : (
                         notes?.map((note) => {
-                            const isAuthor = note.author_id === activeProfile?.id;
+                            const isAuthor = note.author === activeProfile?.id;
                             const canDelete = isAuthor || activeProfile?.role === "admin" || activeProfile?.role === "manager";
 
                             return (
                                 <div key={note.id} className="group relative bg-muted/30 p-4 rounded-lg flex gap-3 text-sm">
                                     <Avatar className="h-8 w-8 shrink-0">
-                                        <AvatarImage src={note.author?.avatar_url} />
-                                        <AvatarFallback>{note.author?.full_name?.[0] || 'U'}</AvatarFallback>
+                                        <AvatarImage src={note.author?.avatarUrl || undefined} />
+                                        <AvatarFallback>{note.author?.fullName?.[0] || 'U'}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1 space-y-1">
                                         <div className="flex items-center justify-between">
                                             <span className="font-medium text-foreground">
-                                                {note.author?.full_name || 'Unknown User'}
+                                                {note.author?.fullName || 'Unknown User'}
                                             </span>
                                             <span className="text-xs text-muted-foreground">
-                                                {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
+                                                {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
                                             </span>
                                         </div>
                                         <p className="text-muted-foreground whitespace-pre-wrap">{note.content}</p>

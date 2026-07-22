@@ -95,7 +95,7 @@ export function EmailComposerDialog({
             form.setValue("subject", template.subject);
             // If in HTML mode, use full HTML. If text mode, strip tags or keep simple.
             // For now, always set the raw body, and let the view decide how to show it.
-            form.setValue("body", template.body_html);
+            form.setValue("body", template.bodyHtml);
         }
     };
 
@@ -154,7 +154,7 @@ export function EmailComposerDialog({
                                 <SelectContent>
                                     {accounts?.map(acc => (
                                         <SelectItem key={acc.id} value={acc.id}>
-                                            {acc.name} {acc.is_org_wide && "(Shared)"} &lt;{acc.email_addr}&gt;
+                                            {acc.fromName || "Unknown"} &lt;{acc.fromEmail}&gt;
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -232,7 +232,7 @@ export function EmailComposerDialog({
                                                 const toastId = toast.loading("AI is drafting your email...");
                                                 // Simulate AI generation
                                                 await new Promise(r => setTimeout(r, 2000));
-                                                const draft = `Hi,<br/><br/>I'm writing to you regarding "<strong>${subject}</strong>".<br/><br/>I would like to discuss next steps and see how we can move forward with our proposal. Please let me know your availability for a brief call this week.<br/><br/>Best regards,<br/>${profile?.full_name || 'The Team'}`;
+                                                const draft = `Hi,<br/><br/>I'm writing to you regarding "<strong>${subject}</strong>".<br/><br/>I would like to discuss next steps and see how we can move forward with our proposal. Please let me know your availability for a brief call this week.<br/><br/>Best regards,<br/>${profile?.fullName || 'The Team'}`;
                                                 form.setValue("body", draft);
                                                 toast.success("Draft generated!", { id: toastId });
                                             }}
