@@ -37,6 +37,7 @@ model Organization {
   automationRules AutomationRule[]
   files           File[]
   notes           Note[]
+  contactStatuses ContactStatus[]
 
   @@map("organizations")
 }
@@ -156,6 +157,10 @@ model Contact {
   phone          String?
   company        String?
   jobTitle       String?                      @map("job_title")
+  status         String?
+  source         String?
+  lastCallStatus String?                      @map("last_call_status")
+  lastCallAt     DateTime?                    @map("last_call_at") @db.Timestamptz
   tags           String[]                     @default([])
   customFields   Json                         @default("{}") @map("custom_fields")
   leadScore      Int                          @default(0) @map("lead_score")
@@ -176,6 +181,19 @@ model Contact {
   @@index([organizationId], map: "idx_contacts_org")
   @@index([email], map: "idx_contacts_email")
   @@map("contacts")
+}
+
+model ContactStatus {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  label          String
+  color          String?
+  order          Int          @default(0)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("contact_statuses")
 }
 
 // ============================================
