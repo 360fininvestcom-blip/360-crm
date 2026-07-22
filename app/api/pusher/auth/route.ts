@@ -21,8 +21,8 @@ export async function POST(req: NextRequest) {
 
         // Fetch user profile for presence data
         const profile = await prisma.profile.findUnique({
-            where: { id: session.user.id },
-            select: { id: true, first_name: true, last_name: true, email: true, avatar_url: true }
+            where: { userId: session.user.id },
+            select: { id: true, fullName: true, email: true, avatarUrl: true }
         });
 
         if (!profile) {
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
             user_info: {
                 profile_id: profile.id,
                 email: profile.email,
-                full_name: `${profile.first_name} ${profile.last_name || ''}`.trim(),
-                avatar_url: profile.avatar_url,
+                full_name: profile.fullName || 'Unknown User',
+                avatar_url: profile.avatarUrl,
                 last_seen: new Date().toISOString(),
                 current_path: "", // Passed from client typically, but default to empty
             },
