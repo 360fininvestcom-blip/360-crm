@@ -125,7 +125,7 @@ export function useCreateContact() {
     return useSWRMutation(
         "contacts",
         async (_, { arg }: { arg: Omit<Contact, "id" | "createdAt" | "updatedAt"> }) => {
-            const res = await fetch('/api/internal/contacts', {
+            const res = await fetch('/api/v1/contacts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(arg)
