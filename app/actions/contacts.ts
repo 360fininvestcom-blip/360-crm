@@ -141,6 +141,15 @@ export async function bulkDeleteContacts(ids: string[]) {
     });
 }
 
+export async function createContact(contact: Omit<Contact, "id" | "createdAt" | "updatedAt">) {
+    const session = await getSession();
+    if (!session?.user) throw new Error("Unauthorized");
+
+    return await prisma.contact.create({
+        data: contact as any
+    });
+}
+
 export async function bulkCreateContacts(contacts: Omit<Contact, "id" | "createdAt" | "updatedAt">[]) {
     const session = await getSession();
     if (!session?.user) throw new Error("Unauthorized");

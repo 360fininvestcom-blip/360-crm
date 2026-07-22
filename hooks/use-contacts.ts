@@ -14,6 +14,7 @@ import {
     updateContact,
     deleteContact,
     bulkDeleteContacts,
+    createContact,
     bulkCreateContacts,
     createContactStatus,
     deleteContactStatus,
@@ -125,18 +126,7 @@ export function useCreateContact() {
     return useSWRMutation(
         "contacts",
         async (_, { arg }: { arg: Omit<Contact, "id" | "createdAt" | "updatedAt"> }) => {
-            const res = await fetch('/api/v1/contacts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(arg)
-            });
-
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || "Failed to create contact");
-            }
-
-            return res.json();
+            return await createContact(arg);
         },
         {
             revalidate: true,
