@@ -3,31 +3,23 @@
 import { useMemo } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
-import { createClient } from "@/lib/supabase/client";
 import { useRealtime } from "./use-realtime";
 import type { Contact, ContactStatus } from "@/types";
-
-// const supabase = createClient(); // Moved inside hooks for SSR safety
-
-// ============================================
-// TYPES
-// ============================================
-
-export interface PaginationParams {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: string;
-    ownerId?: string;
-}
-
-export interface PaginatedResult<T> {
-    data: T[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
+import {
+    fetchContacts,
+    fetchContactsPaginated,
+    fetchContactByPhone,
+    fetchContactStatuses,
+    fetchContactCount,
+    updateContact,
+    deleteContact,
+    bulkDeleteContacts,
+    bulkCreateContacts,
+    createContactStatus,
+    deleteContactStatus,
+    PaginationParams,
+    PaginatedResult
+} from "@/app/actions/contacts";
 
 // ============================================
 // DEFAULT STATUSES
@@ -46,111 +38,20 @@ const DEFAULT_STATUSES: Omit<ContactStatus, "id" | "organization_id" | "created_
     { name: "high_potential", label: "High Potential", color: "yellow", order: 10 },
 ];
 
-// ============================================
-// FETCHERS
-// ============================================
-
-async function fetchContacts(): Promise<Contact[]> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-}
-
-async function fetchContactsPaginated(params: PaginationParams): Promise<PaginatedResult<Contact>> {
-    const { page = 1, limit = 50, search, status, ownerId } = params;
-    const offset = (page - 1) * limit;
-    const supabase = createClient();
-
-    let query = supabase
-        .from("contacts")
-        .select("*", { count: "exact" });
-
-    // Apply owner filter (crucial for visibility bug)
-    if (ownerId && ownerId !== "all") {
-        query = query.eq("owner_id", ownerId);
+async function fetchContactStatusesWithFallback() {
+    try {
+        const statuses = await fetchContactStatuses();
+        if (statuses && statuses.length > 0) return statuses;
+    } catch (e) {
+        console.warn("Could not fetch custom statuses, using defaults:", e);
     }
-
-    // Apply search filter
-    if (search) {
-        query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
-    }
-
-    // Apply status filter
-    if (status) {
-        query = query.eq("status", status);
-    }
-
-    // Apply pagination
-    query = query
-        .order("created_at", { ascending: false })
-        .range(offset, offset + limit - 1);
-
-    const { data, error, count } = await query;
-    if (error) throw error;
-
-    const total = count || 0;
-
-    return {
-        data: data || [],
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-    };
-}
-
-
-
-async function fetchContactByPhone(phone: string): Promise<Contact | null> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("phone", phone)
-        .maybeSingle();
-    if (error) throw error;
-    return data;
-}
-
-async function fetchContactStatuses(): Promise<ContactStatus[]> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-        .from("contact_statuses")
-        .select("*")
-        .order("order", { ascending: true });
-
-    const mapDefaults = () => DEFAULT_STATUSES.map((s, i) => ({
+    
+    return DEFAULT_STATUSES.map((s, i) => ({
         ...s,
         id: `default-${i}`,
         organization_id: "default",
         created_at: new Date().toISOString()
     })) as ContactStatus[];
-
-    if (error) {
-        console.warn("Could not fetch custom statuses, using defaults:", error.message);
-        return mapDefaults();
-    }
-
-    if (!data || data.length === 0) {
-        return mapDefaults();
-    }
-
-    return data;
-}
-
-async function fetchContactCount(profileId?: string, isAdmin?: boolean): Promise<number> {
-    const supabase = createClient();
-    let query = supabase.from("contacts").select("*", { count: "exact", head: true });
-    if (!isAdmin && profileId) {
-        query = query.eq("owner_id", profileId);
-    }
-    const { count, error } = await query;
-    if (error) throw error;
-    return count || 0;
 }
 
 // ============================================
@@ -190,8 +91,6 @@ export function useContactsPaginated(params: PaginationParams = {}) {
     );
 }
 
-
-
 export function useContactByPhone(phone: string | null) {
     return useSWR<Contact | null>(
         phone ? `contact-phone-${phone}` : null,
@@ -201,7 +100,7 @@ export function useContactByPhone(phone: string | null) {
 }
 
 export function useContactStatuses() {
-    const swr = useSWR<ContactStatus[]>("contact-statuses", fetchContactStatuses, {
+    const swr = useSWR<ContactStatus[]>("contact-statuses", fetchContactStatusesWithFallback, {
         revalidateOnFocus: false,
     });
 
@@ -249,7 +148,6 @@ export function useUpdateContact() {
     return useSWRMutation(
         "contacts",
         async (_, { arg }: { arg: { id: string; updates: Partial<Contact> } }) => {
-            const supabase = createClient();
             // Safety check: ensure updates is serializable and not circular
             try {
                 JSON.stringify(arg.updates);
@@ -258,14 +156,7 @@ export function useUpdateContact() {
                 throw new Error("Invalid update payload: circular reference or non-serializable object detected.");
             }
 
-            const { data, error } = await supabase
-                .from("contacts")
-                .update(arg.updates)
-                .eq("id", arg.id)
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await updateContact(arg.id, arg.updates);
         },
         {
             revalidate: true,
@@ -277,11 +168,7 @@ export function useDeleteContact() {
     return useSWRMutation(
         "contacts",
         async (_, { arg }: { arg: string }) => {
-            const supabase = createClient();
-            const { error } = await supabase.from("contacts").delete().eq("id", arg);
-            if (error) {
-                throw new Error(error.message || error.details || JSON.stringify(error));
-            }
+            await deleteContact(arg);
         },
         {
             revalidate: true,
@@ -293,12 +180,8 @@ export function useBulkDeleteContacts() {
     return useSWRMutation(
         "contacts",
         async (_, { arg }: { arg: string[] }) => {
-            const supabase = createClient();
             if (arg.length === 0) return;
-            const { error } = await supabase.from("contacts").delete().in("id", arg);
-            if (error) {
-                throw new Error(error.message || error.details || JSON.stringify(error));
-            }
+            await bulkDeleteContacts(arg);
         },
         {
             revalidate: true,
@@ -310,13 +193,7 @@ export function useBulkCreateContacts() {
     return useSWRMutation(
         "contacts",
         async (_, { arg }: { arg: Omit<Contact, "id" | "created_at" | "updated_at">[] }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("contacts")
-                .insert(arg)
-                .select();
-            if (error) throw error;
-            return data;
+            return await bulkCreateContacts(arg);
         },
         {
             revalidate: true,
@@ -328,14 +205,7 @@ export function useCreateContactStatus() {
     return useSWRMutation(
         "contact-statuses",
         async (_, { arg }: { arg: Omit<ContactStatus, "id" | "created_at"> }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("contact_statuses")
-                .insert([arg])
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await createContactStatus(arg);
         },
         {
             revalidate: true,
@@ -343,18 +213,11 @@ export function useCreateContactStatus() {
     );
 }
 
-
-
 export function useDeleteContactStatus() {
     return useSWRMutation(
         "contact-statuses",
         async (_, { arg }: { arg: string }) => {
-            const supabase = createClient();
-            const { error } = await supabase
-                .from("contact_statuses")
-                .delete()
-                .eq("id", arg);
-            if (error) throw error;
+            await deleteContactStatus(arg);
         }
     );
 }

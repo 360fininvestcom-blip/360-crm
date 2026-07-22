@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { validateApiKey, ApiContext } from "@/lib/api-middleware";
 import { evaluateTriggers } from "@/lib/automations/engine";
@@ -11,22 +12,22 @@ export async function GET(request: Request) {
     if (validation instanceof NextResponse) return validation;
     const { organization_id } = validation as ApiContext;
 
-    const supabase = await createClient();
-    const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "10");
-    const offset = (page - 1) * limit;
+    const countResult = await prisma.$queryRaw`
+        SELECT COUNT(*) as count 
+        FROM contacts 
+        WHERE organization_id = CAST(${organization_id} AS UUID)
+    ` as any[];
+    
+    const count = Number(countResult[0]?.count || 0);
 
-    const { data, error, count } = await supabase
-        .from("contacts")
-        .select("*", { count: "exact" })
-        .eq("organization_id", organization_id)
-        .range(offset, offset + limit - 1)
-        .order("created_at", { ascending: false });
-
-    if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const data = await prisma.$queryRaw`
+        SELECT * 
+        FROM contacts 
+        WHERE organization_id = CAST(${organization_id} AS UUID)
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+    `;
 
     return NextResponse.json({
         data,
@@ -55,21 +56,22 @@ export async function POST(request: Request) {
     try {
         const json = await request.json();
         const body = CONTACT_SCHEMA.parse(json);
-        const supabase = await createClient();
-
-        const { data, error } = await supabase
-            .from("contacts")
-            .insert({
-                ...body,
-                organization_id,
-                source: "API"
-            })
-            .select()
-            .single();
-
-        if (error) {
-            return NextResponse.json({ error: error.message }, { status: 400 });
-        }
+        const inserted = await prisma.$queryRaw`
+            INSERT INTO contacts (
+                organization_id, first_name, last_name, email, phone, company, source
+            ) VALUES (
+                CAST(${organization_id} AS UUID),
+                ${body.first_name},
+                ${body.last_name || null},
+                ${body.email || null},
+                ${body.phone || null},
+                ${body.company || null},
+                'API'
+            )
+            RETURNING *
+        ` as any[];
+        
+        const data = inserted[0];
 
         // Fire Automation Engine Triggers for the newly created lead
         await evaluateTriggers('contact_created', organization_id, {

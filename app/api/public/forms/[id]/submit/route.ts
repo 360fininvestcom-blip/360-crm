@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 export async function POST(
@@ -10,23 +10,18 @@ export async function POST(
     try {
         const body = await request.json();
 
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            { auth: { persistSession: false } }
-        );
-
         // Fetch form details
-        const { data: form, error: formError } = await supabase
-            .from('web_forms')
-            .select('*')
-            .eq('id', id)
-            .eq('is_active', true)
-            .single();
+        const form: any[] = await prisma.$queryRaw`
+            SELECT * FROM web_forms
+            WHERE id = CAST(${id} AS UUID) AND is_active = true
+            LIMIT 1
+        `;
 
-        if (formError || !form) {
+        if (form.length === 0) {
             return NextResponse.json({ error: 'Form not found or inactive' }, { status: 404 });
         }
+
+        const formData = form[0];
 
         // Validate basic fields
         if (!body.email) {
@@ -37,61 +32,64 @@ export async function POST(
         const lastName = body.last_name || body.name?.split(' ').slice(1).join(' ') || '';
 
         // Check if contact already exists
-        const { data: existingContacts } = await supabase
-            .from('contacts')
-            .select('id')
-            .eq('organization_id', form.organization_id)
-            .ilike('email', body.email);
+        const existingContacts: any[] = await prisma.$queryRaw`
+            SELECT id FROM contacts
+            WHERE organization_id = CAST(${formData.organization_id} AS UUID)
+              AND email ILIKE ${body.email}
+            LIMIT 1
+        `;
 
         let contactId;
+        const updatedAt = new Date().toISOString();
 
-        if (existingContacts && existingContacts.length > 0) {
+        if (existingContacts.length > 0) {
             contactId = existingContacts[0].id;
             // Update existing contact safely
-            await supabase
-                .from('contacts')
-                .update({
-                    first_name: firstName || undefined,
-                    last_name: lastName || undefined,
-                    phone: body.phone || undefined,
-                    company: body.company || undefined,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', contactId);
+            await prisma.$executeRaw`
+                UPDATE contacts
+                SET first_name = COALESCE(${firstName || null}, first_name),
+                    last_name = COALESCE(${lastName || null}, last_name),
+                    phone = COALESCE(${body.phone || null}, phone),
+                    company = COALESCE(${body.company || null}, company),
+                    updated_at = CAST(${updatedAt} AS TIMESTAMPTZ)
+                WHERE id = CAST(${contactId} AS UUID)
+            `;
         } else {
             // Create new contact
-            const { data: newContact, error: createError } = await supabase
-                .from('contacts')
-                .insert({
-                    organization_id: form.organization_id,
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: body.email,
-                    phone: body.phone || '',
-                    company: body.company || '',
-                    status: 'new',
-                })
-                .select()
-                .single();
-
-            if (createError) throw createError;
-            contactId = newContact.id;
+            const newContact: any[] = await prisma.$queryRaw`
+                INSERT INTO contacts (organization_id, first_name, last_name, email, phone, company, status, created_at, updated_at)
+                VALUES (
+                    CAST(${formData.organization_id} AS UUID), 
+                    ${firstName}, 
+                    ${lastName}, 
+                    ${body.email}, 
+                    ${body.phone || ''}, 
+                    ${body.company || ''}, 
+                    'new',
+                    CAST(${updatedAt} AS TIMESTAMPTZ),
+                    CAST(${updatedAt} AS TIMESTAMPTZ)
+                )
+                RETURNING id
+            `;
+            contactId = newContact[0].id;
         }
 
         // Log the activity
-        await supabase
-            .from('activities')
-            .insert({
-                organization_id: form.organization_id,
-                contact_id: contactId,
-                type: 'system',
-                title: `Form Submitted: ${form.name}`,
-                description: `Captured via web form. Form Data: ${JSON.stringify(body)}`,
-            });
+        await prisma.$executeRaw`
+            INSERT INTO activities (organization_id, contact_id, type, title, description, created_at)
+            VALUES (
+                CAST(${formData.organization_id} AS UUID),
+                CAST(${contactId} AS UUID),
+                'system',
+                ${`Form Submitted: ${formData.name}`},
+                ${`Captured via web form. Form Data: ${JSON.stringify(body)}`},
+                CAST(${updatedAt} AS TIMESTAMPTZ)
+            )
+        `;
 
         return NextResponse.json({
             success: true,
-            message: form.success_message
+            message: formData.success_message
         });
 
     } catch (err: any) {

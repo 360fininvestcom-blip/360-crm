@@ -1,6 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 import { NextResponse } from "next/server";
+import { Prisma } from '@prisma/client';
 
 export async function POST(req: Request) {
     try {
@@ -10,55 +12,36 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "No enrollment IDs provided" }, { status: 400 });
         }
 
-        const cookieStore = await cookies();
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    get(name: string) {
-                        return cookieStore.get(name)?.value;
-                    },
-                },
-            }
-        );
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+        
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const user = session.user;
 
-        // 1. Get User Session
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        const profile = await prisma.profile.findUnique({
+            where: { userId: user.id },
+            select: { organizationId: true }
+        });
 
-        // 2. Get User Organization
-        const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("organization_id")
-            .eq("user_id", user.id)
-            .single();
-
-        if (profileError || !profile) {
+        if (!profile || !profile.organizationId) {
             return NextResponse.json({ error: "Profile/Organization not found" }, { status: 404 });
         }
 
-        // 3. Delete enrollments (RLS will also handle this if enabled, but we add an explicit check)
-        // We use the authenticated client to ensure RLS is respected
-        const { data, error: deleteError } = await supabase
-            .from("sequence_enrollments")
-            .delete()
-            .in("id", enrollmentIds)
-            .eq("organization_id", profile.organization_id)
-            .select();
+        const idsQuery = Prisma.join(enrollmentIds.map((id: string) => Prisma.sql`CAST(${id} AS UUID)`));
 
-        if (deleteError) {
-            console.error("[API] Delete error:", deleteError);
-            return NextResponse.json({ error: deleteError.message }, { status: 500 });
-        }
+        const deleted: any[] = await prisma.$queryRaw`
+            DELETE FROM sequence_enrollments
+            WHERE organization_id = CAST(${profile.organizationId} AS UUID)
+              AND id IN (${idsQuery})
+            RETURNING id
+        `;
 
         return NextResponse.json({
             success: true,
             count: enrollmentIds.length,
-            deletedCount: data?.length || 0,
-            deletedIds: data?.map(d => d.id) || []
+            deletedCount: deleted?.length || 0,
+            deletedIds: deleted?.map((d: any) => d.id) || []
         });
     } catch (error: unknown) {
         console.error("[API] Unexpected error:", error);

@@ -25,11 +25,10 @@ import {
     SelectValue
 } from "@/components/ui/select";
 import { useActiveProfile } from "@/hooks/use-data";
-import { createClient } from "@/lib/supabase/client";
+import { getActivities } from "@/actions/activities";
 
 export default function ActivitiesPage() {
     const { data: profile } = useActiveProfile();
-    const supabase = createClient();
 
     const [activities, setActivities] = useState<Record<string, any>[]>([]);
     const [loading, setLoading] = useState(true);
@@ -48,20 +47,14 @@ export default function ActivitiesPage() {
 
     async function fetchActivities() {
         setLoading(true);
-        let query = supabase
-            .from('activities')
-            .select('*, contacts(first_name, last_name, avatar_url), deals(name), profiles:created_by(full_name, avatar_url)')
-            .eq('organization_id', profile!.organization_id)
-            .order('created_at', { ascending: false })
-            .range((page - 1) * pageSize, page * pageSize - 1);
-
-        if (typeFilter !== "all") {
-            query = query.eq('type', typeFilter);
+        try {
+            const data = await getActivities(page, pageSize, typeFilter);
+            if (data) setActivities(data);
+        } catch (error) {
+            console.error("Error fetching activities:", error);
+        } finally {
+            setLoading(false);
         }
-
-        const { data } = await query;
-        if (data) setActivities(data);
-        setLoading(false);
     }
 
     const getActivityIcon = (type: string) => {

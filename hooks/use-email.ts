@@ -3,45 +3,26 @@
 import { useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import useSWRMutation from "swr/mutation";
-import { createClient } from "@/lib/supabase/client";
 import { useRealtime } from "./use-realtime";
 import type { EmailTemplate, EmailSequence, SequenceEnrollment, SMTPConfig } from "@/types";
-
-// const supabase = createClient(); // Moved inside functions for SSR safety
+import { 
+    getEmailTemplates, 
+    getEmailSequences, 
+    getSMTPConfigs,
+    createEmailSequence,
+    updateEmailSequence,
+    deleteEmailSequence,
+    createEmailTemplate,
+    updateEmailTemplate,
+    deleteEmailTemplate,
+    getSequenceEnrollments,
+    enrollInSequence,
+    updateEnrollment
+} from "@/actions/email";
 
 // ============================================
 // FETCHERS
 // ============================================
-
-async function fetchEmailTemplates(): Promise<EmailTemplate[]> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-        .from("email_templates")
-        .select("*")
-        .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-}
-
-async function fetchEmailSequences(): Promise<EmailSequence[]> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-        .from("email_sequences")
-        .select("*")
-        .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-}
-
-async function fetchSMTPConfigs(): Promise<SMTPConfig[]> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-        .from("smtp_configs")
-        .select("*")
-        .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-}
 
 async function fetchEmails(url: string) {
     const res = await fetch(url);
@@ -71,7 +52,9 @@ export function useEmails(folder: string = "inbox", page: number = 1, limit: num
 }
 
 export function useEmailTemplates() {
-    const swr = useSWR<EmailTemplate[]>("email-templates", fetchEmailTemplates, {
+    const swr = useSWR<EmailTemplate[]>("email-templates", async () => {
+        return await getEmailTemplates();
+    }, {
         revalidateOnFocus: false,
     });
 
@@ -81,7 +64,9 @@ export function useEmailTemplates() {
 }
 
 export function useEmailSequences() {
-    const swr = useSWR<EmailSequence[]>("email-sequences", fetchEmailSequences, {
+    const swr = useSWR<EmailSequence[]>("email-sequences", async () => {
+        return await getEmailSequences();
+    }, {
         revalidateOnFocus: false,
     });
 
@@ -91,7 +76,9 @@ export function useEmailSequences() {
 }
 
 export function useSMTPConfigs() {
-    const swr = useSWR<SMTPConfig[]>("smtp-configs", fetchSMTPConfigs, {
+    const swr = useSWR<SMTPConfig[]>("smtp-configs", async () => {
+        return await getSMTPConfigs();
+    }, {
         revalidateOnFocus: false,
     });
 
@@ -136,14 +123,7 @@ export function useCreateEmailSequence() {
     return useSWRMutation(
         "email-sequences",
         async (_, { arg }: { arg: Omit<EmailSequence, "id" | "created_at" | "updated_at"> }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("email_sequences")
-                .insert([arg])
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await createEmailSequence(arg);
         },
         {
             revalidate: true,
@@ -155,15 +135,7 @@ export function useUpdateEmailSequence() {
     return useSWRMutation(
         "email-sequences",
         async (_, { arg }: { arg: { id: string; updates: Partial<EmailSequence> } }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("email_sequences")
-                .update(arg.updates)
-                .eq("id", arg.id)
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await updateEmailSequence(arg.id, arg.updates);
         },
         {
             revalidate: true,
@@ -175,12 +147,7 @@ export function useDeleteEmailSequence() {
     return useSWRMutation(
         "email-sequences",
         async (_, { arg }: { arg: string }) => {
-            const supabase = createClient();
-            const { error } = await supabase
-                .from("email_sequences")
-                .delete()
-                .eq("id", arg);
-            if (error) throw error;
+            await deleteEmailSequence(arg);
         }
     );
 }
@@ -193,14 +160,7 @@ export function useCreateEmailTemplate() {
     return useSWRMutation(
         "email-templates",
         async (_, { arg }: { arg: Omit<EmailTemplate, "id" | "created_at" | "updated_at"> }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("email_templates")
-                .insert([arg])
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await createEmailTemplate(arg);
         },
         {
             revalidate: true,
@@ -212,15 +172,7 @@ export function useUpdateEmailTemplate() {
     return useSWRMutation(
         "email-templates",
         async (_, { arg }: { arg: { id: string; updates: Partial<EmailTemplate> } }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("email_templates")
-                .update(arg.updates)
-                .eq("id", arg.id)
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await updateEmailTemplate(arg.id, arg.updates);
         },
         {
             revalidate: true,
@@ -232,12 +184,7 @@ export function useDeleteEmailTemplate() {
     return useSWRMutation(
         "email-templates",
         async (_, { arg }: { arg: string }) => {
-            const supabase = createClient();
-            const { error } = await supabase
-                .from("email_templates")
-                .delete()
-                .eq("id", arg);
-            if (error) throw error;
+            await deleteEmailTemplate(arg);
         }
     );
 }
@@ -248,14 +195,7 @@ export function useDeleteEmailTemplate() {
 
 export function useSequenceEnrollments(sequenceId: string) {
     const swr = useSWR<SequenceEnrollment[]>(sequenceId ? `sequence-enrollments-${sequenceId}` : null, async () => {
-        const supabase = createClient();
-        const { data, error } = await supabase
-            .from("sequence_enrollments")
-            .select("*, contact:contacts(id, first_name, last_name, email)")
-            .eq("sequence_id", sequenceId)
-            .order("created_at", { ascending: false });
-        if (error) throw error;
-        return (data || []) as SequenceEnrollment[];
+        return await getSequenceEnrollments(sequenceId);
     }, {
         revalidateOnFocus: false
     });
@@ -270,31 +210,7 @@ export function useEnrollInSequence() {
     return useSWRMutation(
         "sequence-enrollments",
         async (_, { arg }: { arg: { sequence_id: string; contact_ids: string[]; organization_id: string } }) => {
-            const supabase = createClient();
-            const enrollments = arg.contact_ids.map(contact_id => ({
-                organization_id: arg.organization_id,
-                sequence_id: arg.sequence_id,
-                contact_id,
-                status: "active",
-                current_step: 0,
-                next_send_at: new Date().toISOString()
-            }));
-
-            const { data, error } = await supabase
-                .from("sequence_enrollments")
-                .insert(enrollments)
-                .select();
-
-            if (error) {
-                console.error("Supabase enrollment error:", {
-                    message: error.message,
-                    details: error.details,
-                    hint: error.hint,
-                    code: error.code
-                });
-                throw error;
-            }
-            return data;
+            return await enrollInSequence(arg);
         },
         {
             revalidate: true,
@@ -309,15 +225,7 @@ export function useUpdateEnrollment() {
     return useSWRMutation(
         "sequence-enrollments",
         async (_, { arg }: { arg: { id: string; updates: Partial<SequenceEnrollment>; sequence_id: string } }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("sequence_enrollments")
-                .update(arg.updates)
-                .eq("id", arg.id)
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await updateEnrollment(arg.id, arg.updates);
         },
         {
             revalidate: true,

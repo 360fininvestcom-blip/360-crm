@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 
@@ -20,29 +20,29 @@ export async function validateApiKey(request: Request): Promise<ApiContext | Nex
     // Hash the provided key to compare with stored hash
     const keyHash = createHash("sha256").update(apiKey).digest("hex");
 
-    const supabase = await createClient();
+    const keyRecords: any[] = await prisma.$queryRaw`
+        SELECT * FROM organization_api_keys
+        WHERE key_hash = ${keyHash} AND is_active = true
+        LIMIT 1
+    `;
 
-    const { data: keyRecord, error } = await supabase
-        .from("organization_api_keys")
-        .select("*")
-        .eq("key_hash", keyHash)
-        .eq("is_active", true)
-        .single();
-
-    if (error || !keyRecord) {
+    if (keyRecords.length === 0) {
         return NextResponse.json(
             { error: "Invalid or inactive API Key" },
             { status: 401 }
         );
     }
 
+    const keyRecord = keyRecords[0];
+
     // Update last_used_at (async, fire & forget to not block)
     // In a real app we might use a queue or ensure this doesn't slow down the request significantly
     // For now we await it to be safe or use supabase.rpc if available
-    await supabase
-        .from("organization_api_keys")
-        .update({ last_used_at: new Date().toISOString() })
-        .eq("id", keyRecord.id);
+    await prisma.$executeRaw`
+        UPDATE organization_api_keys
+        SET last_used_at = CAST(${new Date().toISOString()} AS TIMESTAMPTZ)
+        WHERE id = CAST(${keyRecord.id} AS UUID)
+    `;
 
     return {
         organization_id: keyRecord.organization_id,

@@ -1,6 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 import { NextResponse } from "next/server";
+import { Prisma } from '@prisma/client';
 
 export async function POST(req: Request) {
     try {
@@ -9,42 +11,48 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "API Key is required" }, { status: 400 });
         }
 
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+        
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const user = session.user;
 
-        if (!user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        const profile = await prisma.profile.findUnique({
+            where: { userId: user.id },
+            select: { organizationId: true, role: true }
+        });
 
-        // Use Admin Client to bypass RLS for the sensitive api_keys table
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-        const supabaseAdmin = createAdminClient(supabaseUrl, supabaseKey);
-
-        const { data: profileData, error: profileError } = await supabaseAdmin
-            .from("profiles")
-            .select("organization_id, role")
-            .eq("user_id", user.id)
-            .single();
-
-        if (profileError || !profileData) {
+        if (!profile || !profile.organizationId) {
             return NextResponse.json({ error: "Profile not found" }, { status: 404 });
         }
 
         // Only admins/managers can update CRM keys
-        if (!["admin", "manager"].includes(profileData.role)) {
+        if (!["admin", "manager"].includes(profile.role)) {
             return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
         }
 
-        const { error: upsertError } = await supabaseAdmin
-            .from("api_keys")
-            .upsert({ 
-                organization_id: profileData.organization_id, 
-                crm_api_key: apiKey,
-                active_provider: 'openai'
-            }, { onConflict: 'organization_id' });
+        // Upsert logic for api_keys using raw SQL
+        const existingArr: any[] = await prisma.$queryRaw`
+            SELECT id FROM api_keys WHERE organization_id = CAST(${profile.organizationId} AS UUID) LIMIT 1
+        `;
 
-        if (upsertError) throw upsertError;
+        const updatedAt = new Date().toISOString();
+
+        if (existingArr.length > 0) {
+            await prisma.$executeRaw`
+                UPDATE api_keys
+                SET crm_api_key = ${apiKey},
+                    active_provider = 'openai',
+                    updated_at = CAST(${updatedAt} AS TIMESTAMPTZ)
+                WHERE organization_id = CAST(${profile.organizationId} AS UUID)
+            `;
+        } else {
+            await prisma.$executeRaw`
+                INSERT INTO api_keys (organization_id, crm_api_key, active_provider, created_at, updated_at)
+                VALUES (CAST(${profile.organizationId} AS UUID), ${apiKey}, 'openai', CAST(${updatedAt} AS TIMESTAMPTZ), CAST(${updatedAt} AS TIMESTAMPTZ))
+            `;
+        }
 
         return NextResponse.json({ success: true });
     } catch (error: unknown) {

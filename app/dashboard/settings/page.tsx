@@ -1,5 +1,6 @@
 "use client";
 
+import { authClient } from "@/lib/auth-client";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -291,8 +292,7 @@ function SettingsContent() {
             await deleteAccount();
             toast.success("Account deleted successfully. Redirecting...");
             // Force logout and redirect
-            const supabase = createClient();
-            await supabase.auth.signOut();
+            await authClient.signOut();
             window.location.href = "/login";
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Failed to delete account";

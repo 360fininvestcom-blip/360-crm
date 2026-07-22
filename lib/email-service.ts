@@ -1,13 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
 import nodemailer from 'nodemailer';
 import { decrypt } from '@/lib/crypto';
 import { injectTracking } from '@/lib/email-tracking';
-
-const getSupabaseAdmin = () => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-);
+import { Prisma } from '@prisma/client';
 
 export interface SendEmailParams {
     to: string;
@@ -30,20 +25,26 @@ export async function sendEmail({
 }: SendEmailParams) {
     try {
         // 1. Fetch SMTP Config
-        let smtpQuery = getSupabaseAdmin()
-            .from('smtp_configs')
-            .select('*')
-            .eq('organization_id', organizationId);
-
+        let accounts: any[] = [];
         if (accountId) {
-            smtpQuery = smtpQuery.eq('id', accountId);
+            accounts = await prisma.$queryRaw`
+                SELECT * FROM smtp_configs
+                WHERE organization_id = CAST(${organizationId} AS UUID)
+                  AND id = CAST(${accountId} AS UUID)
+                LIMIT 1
+            `;
         } else {
-            smtpQuery = smtpQuery.eq('is_default', true);
+            accounts = await prisma.$queryRaw`
+                SELECT * FROM smtp_configs
+                WHERE organization_id = CAST(${organizationId} AS UUID)
+                  AND is_default = true
+                LIMIT 1
+            `;
         }
 
-        const { data: account, error: accountError } = await smtpQuery.single();
+        const account = accounts[0];
 
-        if (accountError || !account) {
+        if (!account) {
             throw new Error(`SMTP account not found for organization ${organizationId}`);
         }
 
@@ -52,13 +53,14 @@ export async function sendEmail({
         let finalBody = bodyHtml || '';
 
         if (templateId) {
-            const { data: template, error: templateError } = await getSupabaseAdmin()
-                .from('email_templates')
-                .select('*')
-                .eq('id', templateId)
-                .single();
+            const templates: any[] = await prisma.$queryRaw`
+                SELECT * FROM email_templates
+                WHERE id = CAST(${templateId} AS UUID)
+                LIMIT 1
+            `;
+            const template = templates[0];
 
-            if (templateError || !template) {
+            if (!template) {
                 throw new Error(`Template ${templateId} not found`);
             }
 
@@ -77,30 +79,35 @@ export async function sendEmail({
         const password = decrypt(account.smtp_pass_encrypted);
 
         // 4. Pre-log email for tracking ID
-        const { data: emailRecord, error: emailError } = await getSupabaseAdmin()
-            .from('emails')
-            .insert({
-                account_id: account.id,
-                organization_id: organizationId,
-                from_addr: account.email_addr,
-                to_addr: to,
-                subject: finalSubject,
-                body_html: finalBody,
-                folder: 'sent',
-                is_read: true,
-                received_at: new Date().toISOString()
-            })
-            .select()
-            .single();
+        const receivedAt = new Date().toISOString();
+        const emails: any[] = await prisma.$queryRaw`
+            INSERT INTO emails (account_id, organization_id, from_addr, to_addr, subject, body_html, folder, is_read, received_at)
+            VALUES (
+                CAST(${account.id} AS UUID),
+                CAST(${organizationId} AS UUID),
+                ${account.email_addr},
+                ${to},
+                ${finalSubject},
+                ${finalBody},
+                'sent',
+                true,
+                CAST(${receivedAt} AS TIMESTAMPTZ)
+            )
+            RETURNING id
+        `;
 
-        if (emailError) throw emailError;
+        const emailRecord = emails[0];
 
         // 5. Inject Tracking
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const trackedBody = injectTracking(finalBody, emailRecord.id, baseUrl);
 
         // Update record with tracked body
-        await getSupabaseAdmin().from('emails').update({ body_html: trackedBody }).eq('id', emailRecord.id);
+        await prisma.$executeRaw`
+            UPDATE emails 
+            SET body_html = ${trackedBody}
+            WHERE id = CAST(${emailRecord.id} AS UUID)
+        `;
 
         // 6. Generate plain-text fallback and List-Unsubscribe headers
         const listUnsubscribeUrl = `${baseUrl}/api/public/unsubscribe?email=${encodeURIComponent(to)}&org=${organizationId}`;
@@ -142,13 +149,16 @@ export async function sendEmail({
         });
 
         // 7. Log Activity
-        await getSupabaseAdmin().from('activities').insert({
-            organization_id: organizationId,
-            type: 'email',
-            title: `Sent Email: ${finalSubject}`,
-            description: `Sent to ${to}`,
-            metadata: { email_id: emailRecord.id }
-        });
+        await prisma.$executeRaw`
+            INSERT INTO activities (organization_id, type, title, description, metadata)
+            VALUES (
+                CAST(${organizationId} AS UUID),
+                'email',
+                ${`Sent Email: ${finalSubject}`},
+                ${`Sent to ${to}`},
+                ${Prisma.sql`${{ email_id: emailRecord.id }}::jsonb`}
+            )
+        `;
 
         return { success: true, emailId: emailRecord.id };
     } catch (error: unknown) {

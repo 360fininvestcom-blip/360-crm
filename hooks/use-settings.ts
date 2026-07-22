@@ -2,10 +2,23 @@
 
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import type { Profile, Organization, SIPProfile, APIKeys, UserIntegration } from "@/types";
-
-// const supabase = createClient(); // Moved inside hooks for SSR safety
+import { 
+    getActiveProfile, 
+    getProfiles, 
+    getOrganization, 
+    getApiKeys, 
+    getIntegrations, 
+    updateProfile, 
+    deleteProfile, 
+    updateOrganization, 
+    updateApiKeys, 
+    getSipAccounts, 
+    saveSipAccount, 
+    deleteSipAccount, 
+    setDefaultSipAccount 
+} from "@/app/actions/settings";
 
 // ============================================
 // SWR HOOKS
@@ -13,58 +26,34 @@ import type { Profile, Organization, SIPProfile, APIKeys, UserIntegration } from
 
 export function useActiveProfile() {
     return useSWR<Profile | null>("active-profile", async () => {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return null;
-        const { data, error } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
-        if (error) {
-            console.warn(`[Profile] Error fetching profile for user ${user.id}:`, error.message);
-            return null;
-        }
-        return data;
+        return (await getActiveProfile()) as Profile | null;
     });
 }
 
 export function useProfiles() {
     return useSWR<Profile[]>("profiles", async () => {
-        const supabase = createClient();
-        const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
-        if (error) throw error;
-        return data || [];
+        return (await getProfiles()) as Profile[];
     });
 }
 
 export function useOrganization(id: string | null) {
     return useSWR<Organization | null>(id ? `org-${id}` : null, async () => {
         if (!id) return null;
-        const supabase = createClient();
-        const { data, error } = await supabase.from("organizations").select("*").eq("id", id).single();
-        if (error) throw error;
-        return data;
+        return (await getOrganization(id)) as Organization | null;
     });
 }
-
-
-
-
 
 export function useApiKeys(orgId: string | null) {
     return useSWR<APIKeys | null>(orgId ? `api-keys-${orgId}` : null, async () => {
         if (!orgId) return null;
-        const supabase = createClient();
-        const { data, error } = await supabase.from("api_keys").select("*").eq("organization_id", orgId).maybeSingle();
-        if (error) throw error;
-        return data;
+        return (await getApiKeys(orgId)) as APIKeys | null;
     });
 }
 
 export function useIntegrations(userId: string | null) {
     return useSWR<UserIntegration[] | null>(userId ? `integrations-${userId}` : null, async () => {
         if (!userId) return [];
-        const supabase = createClient();
-        const { data, error } = await supabase.from("user_integrations").select("*").eq("user_id", userId);
-        if (error) throw error;
-        return data || [];
+        return (await getIntegrations(userId)) as UserIntegration[];
     });
 }
 
@@ -74,49 +63,25 @@ export function useIntegrations(userId: string | null) {
 
 export function useUpdateProfile() {
     return useSWRMutation("profiles", async (_, { arg }: { arg: { id: string; updates: Partial<Profile> } }) => {
-        const supabase = createClient();
-        const { data, error } = await supabase.from("profiles").update(arg.updates).eq("id", arg.id).select().single();
-        if (error) throw error;
-        return data;
+        return await updateProfile(arg.id, arg.updates);
     });
 }
 
 export function useDeleteProfile() {
     return useSWRMutation("profiles", async (_, { arg }: { arg: string }) => {
-        const supabase = createClient();
-        const { error } = await supabase.from("profiles").delete().eq("id", arg);
-        if (error) throw error;
+        await deleteProfile(arg);
     });
 }
-
-
 
 export function useUpdateOrganization() {
     return useSWRMutation("organizations", async (_, { arg }: { arg: { id: string; updates: Partial<Organization> } }) => {
-        const supabase = createClient();
-        const { data, error } = await supabase.from("organizations").update(arg.updates).eq("id", arg.id).select().single();
-        if (error) throw error;
-        return data;
+        return await updateOrganization(arg.id, arg.updates);
     });
 }
 
-
-
-
-
 export function useUpdateApiKeys() {
     return useSWRMutation("api-keys", async (_, { arg }: { arg: { orgId: string; updates: Partial<APIKeys> } }) => {
-        const supabase = createClient();
-        const { data: existing } = await supabase.from("api_keys").select("id").eq("organization_id", arg.orgId).maybeSingle();
-        if (existing) {
-            const { data, error } = await supabase.from("api_keys").update(arg.updates).eq("organization_id", arg.orgId).select().single();
-            if (error) throw error;
-            return data;
-        } else {
-            const { data, error } = await supabase.from("api_keys").insert([{ ...arg.updates, organization_id: arg.orgId }]).select().single();
-            if (error) throw error;
-            return data;
-        }
+        return await updateApiKeys(arg.orgId, arg.updates);
     });
 }
 
@@ -140,15 +105,7 @@ export function useSyncCalendar() {
 export function useSipAccounts(userId: string | null) {
     return useSWR<SIPProfile[]>(userId ? `sip-accounts-${userId}` : null, async () => {
         if (!userId) return [];
-        const supabase = createClient();
-        const { data, error } = await supabase
-            .from("sip_profiles")
-            .select("*")
-            .eq("user_id", userId)
-            .order("is_default", { ascending: false })
-            .order("created_at", { ascending: true });
-        if (error) throw error;
-        return data || [];
+        return (await getSipAccounts(userId)) as SIPProfile[];
     });
 }
 
@@ -161,80 +118,33 @@ export function useSaveSipAccount() {
             data: Partial<SIPProfile>;
         }
     }) => {
-        const supabase = createClient();
-        const accountData = {
-            ...arg.data,
-            user_id: arg.userId,
-            organization_id: arg.orgId,
-        };
-
-        if (arg.id) {
-            // Update existing
-            const { data, error } = await supabase
-                .from("sip_profiles")
-                .update(accountData)
-                .eq("id", arg.id)
-                .select()
-                .single();
-            if (error) {
-                console.error("[useSaveSipAccount] Supabase DB Update Error:", error.message, error.details, error.hint);
-                throw new Error(error.message || "Database update failed");
-            }
-            return data;
-        } else {
-            // Create new
-            const { data, error } = await supabase
-                .from("sip_profiles")
-                .insert([accountData])
-                .select()
-                .single();
-            if (error) {
-                console.error("[useSaveSipAccount] Supabase DB Insert Error:", error.message, error.details, error.hint);
-                throw new Error(error.message || "Database insert failed");
-            }
-            return data;
-        }
+        return await saveSipAccount(arg.id, arg.userId, arg.orgId, arg.data);
     });
 }
 
 export function useDeleteSipAccount() {
     return useSWRMutation("sip-accounts", async (_, { arg }: { arg: string }) => {
-        const supabase = createClient();
-        const { error } = await supabase
-            .from("sip_profiles")
-            .delete()
-            .eq("id", arg);
-        if (error) throw error;
+        await deleteSipAccount(arg);
     });
 }
 
 export function useSetDefaultSipAccount() {
     return useSWRMutation("sip-accounts", async (_, { arg }: { arg: { id: string; userId: string } }) => {
-        const supabase = createClient();
-        // The database trigger will handle unsetting other defaults
-        const { data, error } = await supabase
-            .from("sip_profiles")
-            .update({ is_default: true })
-            .eq("id", arg.id)
-            .eq("user_id", arg.userId)
-            .select()
-            .single();
-        if (error) throw error;
-        return data;
+        return await setDefaultSipAccount(arg.id, arg.userId);
     });
 }
 
-
 export function useUpdatePassword() {
     return useSWRMutation("auth-password", async (_, { arg }: { arg: string }) => {
-        const supabase = createClient();
-        const { data, error } = await supabase.auth.updateUser({
-            password: arg
+        const { data, error } = await authClient.changePassword({
+            newPassword: arg,
+            revokeOtherSessions: true
         });
         if (error) throw error;
         return data;
     });
 }
+
 export function useDeleteUserAccountFinal() {
     return useSWRMutation("auth-delete", async () => {
         const res = await fetch("/api/auth/delete-account", {

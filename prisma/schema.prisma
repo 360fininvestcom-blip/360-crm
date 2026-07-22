@@ -1,0 +1,479 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ============================================
+// ORGANIZATIONS
+// ============================================
+model Organization {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String   @unique
+  logoUrl         String?  @map("logo_url")
+  primaryColor    String?  @default("#3b82f6") @map("primary_color")
+  secondaryColor  String?  @default("#1e40af") @map("secondary_color")
+  fontFamily      String?  @default("Inter") @map("font_family")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  profiles        Profile[]
+  contacts        Contact[]
+  pipelines       Pipeline[]
+  deals           Deal[]
+  activities      Activity[]
+  tasks           Task[]
+  calendarEvents  CalendarEvent[]
+  sipProfiles     SipProfile[]
+  smtpConfig      SmtpConfig?
+  emailTemplates  EmailTemplate[]
+  emailSequences  EmailSequence[]
+  automationRules AutomationRule[]
+  files           File[]
+  notes           Note[]
+
+  @@map("organizations")
+}
+
+// ============================================
+// PROFILES
+// ============================================
+enum Role {
+  admin
+  manager
+  agent
+  viewer
+}
+
+model Profile {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String?       @map("organization_id") @db.Uuid
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  fullName       String?       @map("full_name")
+  avatarUrl      String?       @map("avatar_url")
+  role           Role          @default(agent)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Better Auth relations
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String?       @unique @map("user_id")
+
+  // App relations
+  ownedContacts  Contact[]
+  ownedDeals     Deal[]
+  activities     Activity[]
+  assignedTasks  Task[]
+  createdEvents  CalendarEvent[]
+  sipProfiles    SipProfile[]
+  files          File[]
+  notes          Note[]
+
+  @@map("profiles")
+}
+
+// ============================================
+// BETTER AUTH MODELS
+// ============================================
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified Boolean   @map("email_verified")
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  sessions      Session[]
+  accounts      Account[]
+  
+  profile       Profile?
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String    @map("user_id")
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("verification")
+}
+
+// ============================================
+// CONTACTS
+// ============================================
+model Contact {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  firstName      String        @map("first_name")
+  lastName       String?       @map("last_name")
+  email          String?
+  phone          String?
+  company        String?
+  jobTitle       String?       @map("job_title")
+  tags           String[]      @default([])
+  customFields   Json          @default("{}") @map("custom_fields")
+  leadScore      Int           @default(0) @map("lead_score")
+  ownerId        String?       @map("owner_id") @db.Uuid
+  owner          Profile?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  embedding      Unsupported("vector(1536)")?
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  deals          Deal[]
+  activities     Activity[]
+  tasks          Task[]
+  events         CalendarEvent[]
+  enrollments    SequenceEnrollment[]
+  files          File[]
+  notes          Note[]
+
+  @@index([organizationId], map: "idx_contacts_org")
+  @@index([email], map: "idx_contacts_email")
+  @@map("contacts")
+}
+
+// ============================================
+// PIPELINES & DEALS
+// ============================================
+model Pipeline {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  stages         Json          @default("[]") // Array of {id, name, order, color}
+  isDefault      Boolean       @default(false) @map("is_default")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  deals          Deal[]
+
+  @@map("pipelines")
+}
+
+model Deal {
+  id                String        @id @default(uuid()) @db.Uuid
+  organizationId    String        @map("organization_id") @db.Uuid
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId         String?       @map("contact_id") @db.Uuid
+  contact           Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  pipelineId        String        @map("pipeline_id") @db.Uuid
+  pipeline          Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name              String
+  value             Decimal       @default(0) @db.Decimal(15,2)
+  currency          String        @default("USD")
+  stage             String
+  probability       Int           @default(0)
+  expectedCloseDate DateTime?     @map("expected_close_date") @db.Date
+  ownerId           String?       @map("owner_id") @db.Uuid
+  owner             Profile?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  embedding         Unsupported("vector(1536)")?
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  activities        Activity[]
+  tasks             Task[]
+  events            CalendarEvent[]
+  files             File[]
+  notes             Note[]
+
+  @@index([organizationId], map: "idx_deals_org")
+  @@index([pipelineId], map: "idx_deals_pipeline")
+  @@index([stage], map: "idx_deals_stage")
+  @@map("deals")
+}
+
+// ============================================
+// ACTIVITIES
+// ============================================
+enum ActivityType {
+  call
+  email
+  note
+  meeting
+  task
+  page_visit
+  file_upload
+  system
+}
+
+model Activity {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?       @map("contact_id") @db.Uuid
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId         String?       @map("deal_id") @db.Uuid
+  deal           Deal?         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  type           ActivityType
+  title          String
+  description    String?
+  metadata       Json?         @default("{}")
+  createdById    String?       @map("created_by") @db.Uuid
+  createdBy      Profile?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId], map: "idx_activities_org")
+  @@index([contactId], map: "idx_activities_contact")
+  @@index([dealId], map: "idx_activities_deal")
+  @@index([type], map: "idx_activities_type")
+  @@index([createdAt(sort: Desc)], map: "idx_activities_created")
+  @@map("activities")
+}
+
+// ============================================
+// TASKS
+// ============================================
+enum TaskPriority {
+  low
+  medium
+  high
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+}
+
+model Task {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?       @map("contact_id") @db.Uuid
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  dealId         String?       @map("deal_id") @db.Uuid
+  deal           Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  title          String
+  description    String?
+  dueDate        DateTime?     @map("due_date") @db.Timestamptz
+  priority       TaskPriority  @default(medium)
+  status         TaskStatus    @default(pending)
+  assignedToId   String?       @map("assigned_to") @db.Uuid
+  assignedTo     Profile?      @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([organizationId], map: "idx_tasks_org")
+  @@index([assignedToId], map: "idx_tasks_assigned")
+  @@index([dueDate], map: "idx_tasks_due")
+  @@map("tasks")
+}
+
+// ============================================
+// CALENDAR EVENTS
+// ============================================
+model CalendarEvent {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  startTime      DateTime      @map("start_time") @db.Timestamptz
+  endTime        DateTime      @map("end_time") @db.Timestamptz
+  allDay         Boolean       @default(false) @map("all_day")
+  contactId      String?       @map("contact_id") @db.Uuid
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  dealId         String?       @map("deal_id") @db.Uuid
+  deal           Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  createdById    String?       @map("created_by") @db.Uuid
+  createdBy      Profile?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId], map: "idx_events_org")
+  @@index([startTime, endTime], map: "idx_events_time")
+  @@map("calendar_events")
+}
+
+// ============================================
+// SIP PROFILES
+// ============================================
+model SipProfile {
+  id                   String        @id @default(uuid()) @db.Uuid
+  organizationId       String        @map("organization_id") @db.Uuid
+  organization         Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId               String        @map("user_id") @db.Uuid
+  user                 Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName          String        @map("display_name")
+  sipUsername          String        @map("sip_username")
+  sipPasswordEncrypted String        @map("sip_password_encrypted")
+  sipDomain            String        @map("sip_domain")
+  outboundProxy        String?       @map("outbound_proxy")
+  isActive             Boolean       @default(true) @map("is_active")
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("sip_profiles")
+}
+
+// ============================================
+// SMTP CONFIGURATIONS
+// ============================================
+model SmtpConfig {
+  id                   String        @id @default(uuid()) @db.Uuid
+  organizationId       String        @unique @map("organization_id") @db.Uuid
+  organization         Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  host                 String
+  port                 Int
+  username             String
+  passwordEncrypted    String        @map("password_encrypted")
+  useTls               Boolean       @default(true) @map("use_tls")
+  fromName             String?       @map("from_name")
+  fromEmail            String?       @map("from_email")
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("smtp_configs")
+}
+
+// ============================================
+// EMAIL TEMPLATES & SEQUENCES
+// ============================================
+model EmailTemplate {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  subject        String
+  bodyHtml       String        @map("body_html")
+  bodyText       String?       @map("body_text")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("email_templates")
+}
+
+model EmailSequence {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  steps          Json          @default("[]") // Array of {id, order, delay_days, template_id, subject_override}
+  isActive       Boolean       @default(true) @map("is_active")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  enrollments    SequenceEnrollment[]
+
+  @@map("email_sequences")
+}
+
+enum SequenceStatus {
+  active
+  paused
+  completed
+  replied
+}
+
+model SequenceEnrollment {
+  id           String        @id @default(uuid()) @db.Uuid
+  sequenceId   String        @map("sequence_id") @db.Uuid
+  sequence     EmailSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  contactId    String        @map("contact_id") @db.Uuid
+  contact      Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  currentStep  Int           @default(0) @map("current_step")
+  status       SequenceStatus @default(active)
+  nextSendAt   DateTime?     @map("next_send_at") @db.Timestamptz
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("sequence_enrollments")
+}
+
+// ============================================
+// AUTOMATION RULES
+// ============================================
+model AutomationRule {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  triggerType    String        @map("trigger_type")
+  triggerConfig  Json?         @default("{}") @map("trigger_config")
+  actions        Json          @default("[]") @map("actions")
+  isActive       Boolean       @default(true) @map("is_active")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("automation_rules")
+}
+
+// ============================================
+// FILES & NOTES
+// ============================================
+model File {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?       @map("contact_id") @db.Uuid
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId         String?       @map("deal_id") @db.Uuid
+  deal           Deal?         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  name           String
+  storagePath    String        @map("storage_path")
+  mimeType       String?       @map("mime_type")
+  sizeBytes      BigInt?       @map("size_bytes")
+  uploadedById   String?       @map("uploaded_by") @db.Uuid
+  uploadedBy     Profile?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("files")
+}
+
+model Note {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?       @map("contact_id") @db.Uuid
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId         String?       @map("deal_id") @db.Uuid
+  deal           Deal?         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  content        String
+  mentions       String[]      @default([]) @db.Uuid
+  createdById    String?       @map("created_by") @db.Uuid
+  createdBy      Profile?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("notes")
+}

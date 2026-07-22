@@ -1,15 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { processWorkflowRun } from '@/lib/automations/engine';
+import { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-    const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-        { auth: { persistSession: false } }
-    );
     // Secret key check (optional but recommended for cron)
     const authHeader = req.headers.get('authorization');
     if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -17,15 +13,16 @@ export async function POST(req: Request) {
     }
 
     try {
+        const now = new Date().toISOString();
+        
         // 1. Fetch runs due for processing
-        const { data: runs, error: runsError } = await supabaseAdmin
-            .from('workflow_runs')
-            .select('id')
-            .in('status', ['running', 'waiting'])
-            .or(`next_execution_at.lte.${new Date().toISOString()},next_execution_at.is.null`)
-            .limit(20);
+        const runs: any[] = await prisma.$queryRaw`
+            SELECT id FROM workflow_runs
+            WHERE status IN ('running', 'waiting')
+              AND (next_execution_at <= CAST(${now} AS TIMESTAMPTZ) OR next_execution_at IS NULL)
+            LIMIT 20
+        `;
 
-        if (runsError) throw runsError;
         if (!runs || runs.length === 0) {
             return NextResponse.json({ success: true, message: 'No runs to process' });
         }
@@ -50,4 +47,3 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: message }, { status: 500 });
     }
 }
-

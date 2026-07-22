@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
+import { getSipAccounts } from "@/app/actions/settings";
 import { useDialerStore } from "@/lib/stores";
 import type { SIPProfile } from "@/types";
 
@@ -17,8 +18,8 @@ export function SipProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            const sessionResult = await authClient.getSession();
+            const user = sessionResult?.data?.user;
 
             if (!user) {
                 console.log("[SIP] No user logged in, using demo mode");
@@ -30,31 +31,11 @@ export function SipProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // First get the profile to get the profile.id
-            const { data: userProfile } = await supabase
-                .from("profiles")
-                .select("id")
-                .eq("user_id", user.id)
-                .single();
-
-            if (!userProfile) {
-                console.log("[SIP] No profile found, using demo mode");
-                sipService.connect({
-                    uri: `sip:${user.email?.replace("@", "_")}@demo.local`,
-                    ws_servers: "wss://demo.local/ws",
-                    display_name: user.email || "User"
-                });
-                return;
-            }
-
-            // Fetch all active SIP Profiles using the profile.id
-            const { data: sipProfiles, error } = await supabase
-                .from("sip_profiles")
-                .select("*")
-                .eq("user_id", userProfile.id)
-                .eq("is_active", true);
-
-            if (error) {
+            // Fetch all active SIP Profiles using the user's ID
+            let sipProfiles;
+            try {
+                sipProfiles = await getSipAccounts(user.id);
+            } catch (error) {
                 console.error("[SIP] Error fetching SIP profiles:", error);
             }
 

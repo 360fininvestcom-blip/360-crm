@@ -36,7 +36,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { useCreateCalendarEvent } from "@/hooks/use-data";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 
 const formSchema = z.object({
     title: z.string().min(1, "Title is required"),
@@ -67,20 +67,19 @@ export function EventDialog({
     const [orgId, setOrgId] = useState<string | null>(null);
 
     const { trigger: createEvent, isMutating } = useCreateCalendarEvent();
-    const supabase = createClient();
 
     useEffect(() => {
         async function getUser() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                setUserId(user.id);
+            const { data } = await authClient.getSession();
+            if (data?.user) {
+                setUserId(data.user.id);
                 // In a real app, we'd fetch the user's org ID from their profile
                 // For now using the demo org ID
                 setOrgId("00000000-0000-0000-0000-000000000001");
             }
         }
         getUser();
-    }, [supabase.auth]);
+    }, []);
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),

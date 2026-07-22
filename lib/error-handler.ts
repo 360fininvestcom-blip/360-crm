@@ -4,7 +4,7 @@
  * Provides consistent error handling across the application.
  */
 
-import { PostgrestError } from "@supabase/supabase-js";
+import { Prisma } from "@prisma/client";
 import { ValidationError } from "./validations/schemas";
 
 export type AppError = {
@@ -18,13 +18,13 @@ export type AppError = {
  * Convert any error to a standardized AppError format
  */
 export function handleError(error: unknown): AppError {
-    // Supabase/Postgres errors
-    if (isPostgrestError(error)) {
+    // Prisma errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
         return {
             message: error.message,
             code: error.code,
-            status: getStatusFromCode(error.code),
-            details: error.details || error.hint,
+            status: getStatusFromPrismaCode(error.code),
+            details: error.meta ? JSON.stringify(error.meta) : undefined,
         };
     }
 
@@ -55,28 +55,13 @@ export function handleError(error: unknown): AppError {
 }
 
 /**
- * Type guard for Postgrest errors
+ * Map Prisma error codes to HTTP status codes
  */
-function isPostgrestError(error: unknown): error is PostgrestError {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        "message" in error
-    );
-}
-
-/**
- * Map Postgres error codes to HTTP status codes
- */
-function getStatusFromCode(code: string): number {
+function getStatusFromPrismaCode(code: string): number {
     const codeMap: Record<string, number> = {
-        "23505": 409, // Unique violation
-        "23503": 400, // Foreign key violation
-        "23502": 400, // Not null violation
-        "22P02": 400, // Invalid text representation
-        "42501": 403, // Insufficient privilege
-        "PGRST116": 404, // Not found
+        "P2002": 409, // Unique constraint failed
+        "P2003": 400, // Foreign key constraint failed
+        "P2025": 404, // Record not found
     };
     return codeMap[code] || 500;
 }

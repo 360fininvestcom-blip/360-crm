@@ -1,20 +1,15 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
-        }
-    );
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = session.user;
 
     const { searchParams } = new URL(request.url);
     const folder = searchParams.get('folder') || 'inbox';
@@ -23,27 +18,31 @@ export async function GET(request: Request) {
     const offset = (page - 1) * limit;
 
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const profile = await prisma.profile.findUnique({
+            where: { userId: user.id },
+            select: { organizationId: true }
+        });
 
-        // Get organization_id for the user
-        // Assuming user is in an organization context or we fetch it from their profile
-        // For simplicity, we'll try to get it from the request query or infer it
-        // A better way is if the client passes it, or we fetch it from a 'profiles' or 'members' table
-        // But let's check how other routes do it. The sync route expects it in the body.
-        // Here we might need to fetch it or rely on RLS if policies are set up correctly.
+        if (!profile || !profile.organizationId) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
 
-        // Actually, RLS policies on 'emails' table use `get_user_org_id()` function.
-        // So we just need to select from 'emails'.
+        const orgId = profile.organizationId;
 
-        const { data, count, error } = await supabase
-            .from('emails')
-            .select('*', { count: 'exact' })
-            .eq('folder', folder)
-            .order('received_at', { ascending: false })
-            .range(offset, offset + limit - 1);
+        const data: any[] = await prisma.$queryRaw`
+            SELECT * FROM emails
+            WHERE organization_id = CAST(${orgId} AS UUID)
+              AND folder = ${folder}
+            ORDER BY received_at DESC
+            LIMIT ${limit} OFFSET ${offset}
+        `;
 
-        if (error) throw error;
+        const counts: any[] = await prisma.$queryRaw`
+            SELECT COUNT(*) FROM emails
+            WHERE organization_id = CAST(${orgId} AS UUID)
+              AND folder = ${folder}
+        `;
+        const count = Number(counts[0].count);
 
         return NextResponse.json({
             data,

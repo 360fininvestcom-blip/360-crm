@@ -1,12 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { validateApiKey } from "@/lib/api-auth";
 import { evaluateTriggers } from "@/lib/automations/engine";
+import { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 /**
  * POST /api/v1/Lead
@@ -33,31 +31,21 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing required fields: firstName and emailAddress (or email) are required" }, { status: 400 });
         }
 
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
         const status = body.status || "new";
         
-        const contactData = {
-            organization_id: orgId,
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            phone: phone,
-            status: status,
-            source: "API Integration",
-            tags: ["External API"],
-        };
-
-        const { data: contact, error: insertError } = await supabase
-            .from("contacts")
-            .insert(contactData)
-            .select()
-            .single();
-
-        if (insertError) {
-            console.error("API Lead Insert Error:", insertError);
-            return NextResponse.json({ error: "Failed to create lead" }, { status: 500 });
-        }
+        // We use Prisma to insert the contact
+        const contact = await prisma.contact.create({
+            data: {
+                organizationId: orgId,
+                firstName: firstName,
+                lastName: lastName,
+                email: email,
+                phone: phone,
+                status: status,
+                source: "API Integration",
+                tags: ["External API"],
+            }
+        });
 
         // Trigger Automations
         try {
@@ -101,17 +89,8 @@ export async function GET(request: Request) {
         }
 
         const { searchParams } = new URL(request.url);
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
-        let query = supabase
-            .from("contacts")
-            .select("id, first_name, last_name, email, phone, status, created_at")
-            .eq("organization_id", orgId)
-            .order("created_at", { ascending: false });
 
         // Parse EspoCRM-style "where" filters
-        // Example: where[0][type]=after&where[0][field]=createdAt&where[0][value]=2023-12-5T00:00:00
-        
         let i = 0;
         const filtersFound: { field: string; type: string; value: string }[] = [];
         
@@ -128,44 +107,56 @@ export async function GET(request: Request) {
             if (i > 20) break; // Safety break
         }
 
+        let whereClause: Prisma.ContactWhereInput = {
+            organizationId: orgId
+        };
+
         for (const filter of filtersFound) {
             const { field, type, value } = filter;
             
-            // Map EspoCRM fields to DB fields
             let dbField = field;
-            if (field === "createdAt") dbField = "created_at";
-            if (field === "firstName") dbField = "first_name";
-            if (field === "lastName") dbField = "last_name";
+            if (field === "createdAt") dbField = "createdAt";
+            if (field === "firstName") dbField = "firstName";
+            if (field === "lastName") dbField = "lastName";
             if (field === "emailAddress") dbField = "email";
             if (field === "phoneNumber") dbField = "phone";
 
             if (type === "after") {
-                query = query.gte(dbField, value);
+                whereClause[dbField as keyof Prisma.ContactWhereInput] = { gte: new Date(value) } as any;
             } else if (type === "before") {
-                query = query.lte(dbField, value);
+                whereClause[dbField as keyof Prisma.ContactWhereInput] = { lte: new Date(value) } as any;
             } else if (type === "equals") {
-                query = query.eq(dbField, value);
+                whereClause[dbField as keyof Prisma.ContactWhereInput] = value;
             } else if (type === "contains") {
-                query = query.ilike(dbField, `%${value}%`);
+                whereClause[dbField as keyof Prisma.ContactWhereInput] = { contains: value, mode: 'insensitive' } as any;
             }
         }
 
-        const { data: contacts, error: fetchError } = await query;
-
-        if (fetchError) {
-            console.error("GET /api/v1/Lead Fetch Error:", fetchError);
-            return NextResponse.json({ error: "Failed to fetch leads" }, { status: 500 });
-        }
+        const contacts = await prisma.contact.findMany({
+            where: whereClause,
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                status: true,
+                createdAt: true
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
 
         // Map fields back to Espo style
-        const espoContacts = (contacts || []).map(c => ({
+        const espoContacts = contacts.map(c => ({
             id: c.id,
-            firstName: c.first_name,
-            lastName: c.last_name,
+            firstName: c.firstName,
+            lastName: c.lastName,
             emailAddress: c.email,
             phoneNumber: c.phone,
             status: c.status,
-            createdAt: c.created_at
+            createdAt: c.createdAt
         }));
 
         return NextResponse.json({

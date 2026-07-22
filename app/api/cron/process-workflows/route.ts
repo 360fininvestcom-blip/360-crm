@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
 import { processWorkflowRun } from '@/lib/automations/engine';
+import { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,26 +13,16 @@ export async function GET(request: Request) {
     }
 
     try {
-        const supabaseAdmin = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            { auth: { persistSession: false } }
-        );
-
         // 1. Find all workflow runs that are 'waiting' (paused on a delay node)
         // AND whose resume timestamp has tipped into the past
-        const { data: pendingRuns, error } = await supabaseAdmin
-            .from('workflow_runs')
-            .select('id')
-            .eq('status', 'waiting')
-            .lte('next_execution_at', new Date().toISOString())
-            .order('next_execution_at', { ascending: true })
-            .limit(50); // Batch limit to prevent Vercel Function timeouts
-
-        if (error) {
-             console.error('Error fetching pending workflows:', error);
-             return NextResponse.json({ error: error.message }, { status: 500 });
-        }
+        const now = new Date().toISOString();
+        const pendingRuns: { id: string }[] = await prisma.$queryRaw`
+            SELECT id FROM workflow_runs
+            WHERE status = 'waiting'
+              AND next_execution_at <= CAST(${now} AS TIMESTAMPTZ)
+            ORDER BY next_execution_at ASC
+            LIMIT 50
+        `;
 
         if (!pendingRuns || pendingRuns.length === 0) {
             return NextResponse.json({ message: 'No pending workflows to process' });

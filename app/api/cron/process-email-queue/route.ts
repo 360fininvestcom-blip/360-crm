@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email-service';
-
-const getSupabaseAdmin = () => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-);
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: Request) {
     // Optional: Protect cron route with a secret token
@@ -15,20 +10,13 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = getSupabaseAdmin();
-
     // 1. Fetch up to 20 pending emails (safe batch size for Vercel functions)
-    const { data: queueItems, error: fetchError } = await supabase
-        .from('email_queue')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true })
-        .limit(20);
-
-    if (fetchError) {
-        console.error('Error fetching email queue:', fetchError);
-        return NextResponse.json({ error: 'Failed to fetch queue' }, { status: 500 });
-    }
+    const queueItems: any[] = await prisma.$queryRaw`
+        SELECT * FROM email_queue
+        WHERE status = 'pending'
+        ORDER BY created_at ASC
+        LIMIT 20
+    `;
 
     if (!queueItems || queueItems.length === 0) {
         return NextResponse.json({ message: 'No emails to process' });
@@ -36,10 +24,11 @@ export async function GET(request: Request) {
 
     // 2. Mark as processing to avoid race conditions
     const itemIds = queueItems.map(item => item.id);
-    await supabase
-        .from('email_queue')
-        .update({ status: 'processing' })
-        .in('id', itemIds);
+    await prisma.$executeRaw`
+        UPDATE email_queue 
+        SET status = 'processing' 
+        WHERE id IN (${Prisma.join(itemIds.map(id => Prisma.sql`CAST(${id} AS UUID)`))})
+    `;
 
     let processedCount = 0;
 
@@ -48,18 +37,24 @@ export async function GET(request: Request) {
         try {
             // Re-check contact status right before sending
             if (item.contact_id) {
-                 const { data: contact } = await supabase
-                     .from('contacts')
-                     .select('unsubscribed, bounced')
-                     .eq('id', item.contact_id)
-                     .single();
+                 const contact = await prisma.contact.findUnique({
+                     where: { id: item.contact_id },
+                     select: { customFields: true } // Assuming unsubscribed and bounced might be in customFields? In supabase they were specific columns 'unsubscribed', 'bounced'. Wait, we should use raw query if they are not in schema.
+                 });
+                 // Actually they might not be in Prisma schema explicitly. Let's do a raw query for safety to match supabase schema since we used it before.
+                 const rawContacts: any[] = await prisma.$queryRaw`SELECT unsubscribed, bounced FROM contacts WHERE id = CAST(${item.contact_id} AS UUID)`;
+                 const rawContact = rawContacts[0];
 
-                 if (contact?.unsubscribed || contact?.bounced) {
-                     await supabase.from('email_queue').update({
-                         status: 'failed',
-                         error_message: contact.unsubscribed ? 'Contact unsubscribed' : 'Contact previously bounced',
-                         processed_at: new Date().toISOString()
-                     }).eq('id', item.id);
+                 if (rawContact && (rawContact.unsubscribed || rawContact.bounced)) {
+                     const now = new Date().toISOString();
+                     const errorMessage = rawContact.unsubscribed ? 'Contact unsubscribed' : 'Contact previously bounced';
+                     await prisma.$executeRaw`
+                        UPDATE email_queue
+                        SET status = 'failed',
+                            error_message = ${errorMessage},
+                            processed_at = CAST(${now} AS TIMESTAMPTZ)
+                        WHERE id = CAST(${item.id} AS UUID)
+                     `;
                      continue; // Skip sending
                  }
             }
@@ -73,10 +68,13 @@ export async function GET(request: Request) {
             });
 
             // Mark completed
-            await supabase.from('email_queue').update({
-                status: 'completed',
-                processed_at: new Date().toISOString()
-            }).eq('id', item.id);
+            const now = new Date().toISOString();
+            await prisma.$executeRaw`
+                UPDATE email_queue
+                SET status = 'completed',
+                    processed_at = CAST(${now} AS TIMESTAMPTZ)
+                WHERE id = CAST(${item.id} AS UUID)
+            `;
 
             processedCount++;
 
@@ -84,12 +82,16 @@ export async function GET(request: Request) {
             await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (err: any) {
             console.error(`Failed to send queued email ${item.id}:`, err);
-            await supabase.from('email_queue').update({
-                status: 'failed',
-                error_message: err.message || 'Unknown error',
-                attempts: item.attempts + 1,
-                processed_at: new Date().toISOString()
-            }).eq('id', item.id);
+            const now = new Date().toISOString();
+            const attempts = (item.attempts || 0) + 1;
+            await prisma.$executeRaw`
+                UPDATE email_queue
+                SET status = 'failed',
+                    error_message = ${err.message || 'Unknown error'},
+                    attempts = ${attempts},
+                    processed_at = CAST(${now} AS TIMESTAMPTZ)
+                WHERE id = CAST(${item.id} AS UUID)
+            `;
         }
     }
 

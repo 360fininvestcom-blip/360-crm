@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { useActiveProfile } from "@/hooks/use-data";
 import { useDialerStore } from "@/lib/stores";
 import { Phone } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -30,7 +30,6 @@ import { InstallAppButton } from "@/components/ui/install-app-button";
 
 export function Topbar() {
     const router = useRouter();
-    const supabase = createClient();
     const { theme, setTheme } = useTheme();
 
     // Use Real-time Notifications Hook
@@ -43,7 +42,7 @@ export function Topbar() {
 
     const handleLogout = async () => {
         try {
-            await supabase.auth.signOut();
+            await authClient.signOut();
             router.push("/login");
             toast.success("Logged out successfully");
         } catch (error) {

@@ -9,12 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { ClientMotionSSR as ClientMotion } from "@/components/landing/client-motion-ssr";
 
 export default function SignupContent() {
     const router = useRouter();
-    const supabase = createClient();
     const [formData, setFormData] = useState({
         fullName: "",
         email: "",
@@ -29,16 +28,10 @@ export default function SignupContent() {
 
         try {
             // Sign up the user
-            const { data, error } = await supabase.auth.signUp({
+            const { data, error } = await authClient.signUp.email({
                 email: formData.email,
                 password: formData.password,
-                options: {
-                    data: {
-                        full_name: formData.fullName,
-                        company: formData.company,
-                    },
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
-                },
+                name: formData.fullName,
             });
 
             if (error) {
@@ -46,20 +39,10 @@ export default function SignupContent() {
                 return;
             }
 
-            if (data.user) {
-                // Check if email confirmation is required
-                if (data.user.identities?.length === 0) {
-                    toast.error("An account with this email already exists");
-                } else if (data.session) {
-                    // User is signed in immediately (email confirmation disabled)
-                    toast.success("Account created successfully!");
-                    router.push("/dashboard");
-                    router.refresh();
-                } else {
-                    // Email confirmation required
-                    toast.success("Check your email to confirm your account");
-                    router.push("/login");
-                }
+            if (data?.user) {
+                toast.success("Account created successfully!");
+                router.push("/dashboard");
+                router.refresh();
             }
         } catch (error) {
             console.error("Signup error:", error);
@@ -70,11 +53,9 @@ export default function SignupContent() {
     };
 
     const handleGoogleSignup = async () => {
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { error } = await authClient.signIn.social({
             provider: "google",
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-            },
+            callbackURL: `${window.location.origin}/dashboard`,
         });
         if (error) {
             toast.error(error.message);
@@ -82,11 +63,9 @@ export default function SignupContent() {
     };
 
     const handleGitHubSignup = async () => {
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { error } = await authClient.signIn.social({
             provider: "github",
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-            },
+            callbackURL: `${window.location.origin}/dashboard`,
         });
         if (error) {
             toast.error(error.message);

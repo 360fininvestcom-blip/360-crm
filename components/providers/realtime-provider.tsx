@@ -1,49 +1,32 @@
 "use client";
 
 import { useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { pusherClient } from "@/lib/pusher-client";
 import { toast } from "sonner";
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
-    const supabase = createClient();
-
     useEffect(() => {
+        const contactsChannel = pusherClient.subscribe('public-contacts');
+        contactsChannel.bind('contact-inserted', (payload: any) => {
+            toast.success("New Contact Added", {
+                description: `${payload.first_name} ${payload.last_name || ''} was just added to the CRM.`,
+            });
+        });
 
-        // Listen for new contacts
-        const contactsChannel = supabase
-            .channel('public:contacts')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'contacts' },
-                (payload) => {
-                    // Only notify if it was created by someone else (we assume the current user's inserts are expected)
-                    // If we had a created_by field we could check: payload.new.created_by !== user.id
-                    toast.success("New Contact Added", {
-                        description: `${payload.new.first_name} ${payload.new.last_name || ''} was just added to the CRM.`,
-                    });
-                }
-            )
-            .subscribe();
-
-        // Listen for new deals
-        const dealsChannel = supabase
-            .channel('public:deals')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'deals' },
-                (payload) => {
-                    toast.success("New Deal Created", {
-                        description: `Deal "${payload.new.name}" was just added to the pipeline.`,
-                    });
-                }
-            )
-            .subscribe();
+        const dealsChannel = pusherClient.subscribe('public-deals');
+        dealsChannel.bind('deal-inserted', (payload: any) => {
+            toast.success("New Deal Created", {
+                description: `Deal "${payload.name}" was just added to the pipeline.`,
+            });
+        });
 
         return () => {
-            supabase.removeChannel(contactsChannel);
-            supabase.removeChannel(dealsChannel);
+            contactsChannel.unbind_all();
+            pusherClient.unsubscribe('public-contacts');
+            dealsChannel.unbind_all();
+            pusherClient.unsubscribe('public-deals');
         };
-    }, [supabase]);
+    }, []);
 
     return <>{children}</>;
 }

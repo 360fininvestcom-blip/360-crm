@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { pusherClient } from "@/lib/pusher-client";
 import { useActiveProfile } from "@/hooks/use-data";
 
 interface PresenceState {
@@ -23,57 +23,40 @@ const PresenceContext = createContext<{
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const { data: profile } = useActiveProfile();
     const [presence, setPresence] = useState<PresenceState>({ users: {} });
-    const supabase = createClient();
 
     useEffect(() => {
         if (!profile?.organization_id) return;
 
-        const channel = supabase.channel(`org_presence:${profile.organization_id}`, {
-            config: {
-                presence: {
-                    key: profile.id,
-                },
-            },
+        const channelName = `presence-org-${profile.organization_id}`;
+        const channel = pusherClient.subscribe(channelName) as any;
+
+        channel.bind('pusher:subscription_succeeded', (members: any) => {
+            const formattedUsers: PresenceState["users"] = {};
+            members.each((member: any) => {
+                formattedUsers[member.id] = member.info;
+            });
+            setPresence({ users: formattedUsers });
         });
 
-        channel
-            .on("presence", { event: "sync" }, () => {
-                const state = channel.presenceState();
-                const formattedUsers: PresenceState["users"] = {};
+        channel.bind('pusher:member_added', (member: any) => {
+            setPresence(prev => ({
+                users: { ...prev.users, [member.id]: member.info }
+            }));
+        });
 
-                Object.keys(state).forEach((key) => {
-                    const typedState = state[key] as unknown as Array<{
-                        profile_id: string;
-                        email: string;
-                        full_name: string;
-                        avatar_url?: string;
-                        last_seen: string;
-                        current_path: string;
-                    }>;
-                    if (typedState[0]) {
-                        formattedUsers[key] = typedState[0];
-                    }
-                });
-
-                setPresence({ users: formattedUsers });
-            })
-            .subscribe(async (status) => {
-                if (status === "SUBSCRIBED") {
-                    await channel.track({
-                        profile_id: profile.id,
-                        email: profile.email,
-                        full_name: profile.full_name,
-                        avatar_url: profile.avatar_url,
-                        last_seen: new Date().toISOString(),
-                        current_path: window.location.pathname,
-                    });
-                }
+        channel.bind('pusher:member_removed', (member: any) => {
+            setPresence(prev => {
+                const newUsers = { ...prev.users };
+                delete newUsers[member.id];
+                return { users: newUsers };
             });
+        });
 
         return () => {
-            channel.unsubscribe();
+            channel.unbind_all();
+            pusherClient.unsubscribe(channelName);
         };
-    }, [profile, supabase]);
+    }, [profile]);
 
     return (
         <PresenceContext.Provider value={{ presence, onlineCount: Object.keys(presence.users).length }}>

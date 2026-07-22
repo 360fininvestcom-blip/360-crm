@@ -1,24 +1,28 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 
 export async function POST(request: Request) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
-        }
-    );
-
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+        
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const user = session.user;
+
+        const profile = await prisma.profile.findUnique({
+            where: { userId: user.id },
+            select: { organizationId: true }
+        });
+
+        if (!profile || !profile.organizationId) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
+
+        const orgId = profile.organizationId;
 
         const body = await request.json();
         const { emailIds, action, destination } = body;
@@ -31,40 +35,41 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Action required' }, { status: 400 });
         }
 
-        let error;
+        const idsQuery = Prisma.join(emailIds.map((id: string) => Prisma.sql`CAST(${id} AS UUID)`));
 
         if (action === 'delete') {
             // Permanent delete
-            const { error: deleteError } = await supabase
-                .from('emails')
-                .delete()
-                .in('id', emailIds);
-            error = deleteError;
+            await prisma.$executeRaw`
+                DELETE FROM emails
+                WHERE organization_id = CAST(${orgId} AS UUID)
+                  AND id IN (${idsQuery})
+            `;
         } else if (action === 'move') {
             if (!destination) return NextResponse.json({ error: 'Destination folder required' }, { status: 400 });
 
-            const { error: updateError } = await supabase
-                .from('emails')
-                .update({ folder: destination })
-                .in('id', emailIds);
-            error = updateError;
+            await prisma.$executeRaw`
+                UPDATE emails
+                SET folder = ${destination}
+                WHERE organization_id = CAST(${orgId} AS UUID)
+                  AND id IN (${idsQuery})
+            `;
         } else if (action === 'mark_read') {
-            const { error: updateError } = await supabase
-                .from('emails')
-                .update({ is_read: true })
-                .in('id', emailIds);
-            error = updateError;
+            await prisma.$executeRaw`
+                UPDATE emails
+                SET is_read = true
+                WHERE organization_id = CAST(${orgId} AS UUID)
+                  AND id IN (${idsQuery})
+            `;
         } else if (action === 'mark_unread') {
-            const { error: updateError } = await supabase
-                .from('emails')
-                .update({ is_read: false })
-                .in('id', emailIds);
-            error = updateError;
+            await prisma.$executeRaw`
+                UPDATE emails
+                SET is_read = false
+                WHERE organization_id = CAST(${orgId} AS UUID)
+                  AND id IN (${idsQuery})
+            `;
         } else {
             return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
         }
-
-        if (error) throw error;
 
         return NextResponse.json({ success: true });
 

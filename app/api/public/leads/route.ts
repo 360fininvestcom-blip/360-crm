@@ -1,14 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
     try {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://xqsewdcggvujkmddtltd.supabase.co";
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
         // 1. Validate Form ID (Header or Body)
         const headersObj = Object.fromEntries(
             Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
@@ -19,23 +15,21 @@ export async function POST(request: Request) {
         console.log("DEBUG: formId from headers:", formId);
         console.log("DEBUG: contentType:", contentType);
 
-        let body: Record<string, any> = {}; // Initialize body here for later use
+        let body: Record<string, any> = {};
 
         if (!formId) {
             // Check body for x-form-id (standard HTML forms)
             if (contentType?.includes("application/x-www-form-urlencoded") || contentType?.includes("multipart/form-data")) {
                 const formData = await request.formData();
                 formId = formData.get("x-form-id") as string;
-                body = Object.fromEntries(formData.entries()); // Populate body from formData
+                body = Object.fromEntries(formData.entries());
                 console.log("DEBUG: formId from formData:", formId);
             } else if (contentType?.includes("application/json")) {
-                // Clone request to read body multiple times if needed
                 body = await request.clone().json();
                 formId = body["x-form-id"];
                 console.log("DEBUG: formId from JSON body:", formId);
             }
         } else {
-            // If formId was found in headers, still parse body if needed for other fields
             if (contentType?.includes("application/json")) {
                 body = await request.json();
             } else if (contentType?.includes("application/x-www-form-urlencoded") || contentType?.includes("multipart/form-data")) {
@@ -44,21 +38,20 @@ export async function POST(request: Request) {
             }
         }
 
-
         if (!formId) {
             console.log("DEBUG: Returning 400 - missing formId");
             return NextResponse.json({ error: "Missing Form ID" }, { status: 400 });
         }
 
         // 2. Fetch Form Configuration
-        const { data: form, error: formError } = await supabase
-            .from("web_forms")
-            .select("*")
-            .eq("id", formId)
-            .eq("status", "active")
-            .single();
+        const form = await prisma.webForm.findFirst({
+            where: {
+                id: formId,
+                status: "active"
+            }
+        });
 
-        if (formError || !form) {
+        if (!form) {
             return NextResponse.json(
                 { error: "Invalid form ID or form is inactive" },
                 { status: 404 }
@@ -66,12 +59,12 @@ export async function POST(request: Request) {
         }
 
         // 6. Map Fields
-        const fieldMapping = form.config as Record<string, string>;
+        const fieldMapping = (form.config as Record<string, string>) || {};
         const contactData: Record<string, any> = {
-            organization_id: form.organization_id,
+            organizationId: form.organizationId,
             tags: ["Web Lead", form.name],
             source: form.source || "Web Form",
-            custom_fields: {
+            customFields: {
                 status: "New"
             }
         };
@@ -81,7 +74,8 @@ export async function POST(request: Request) {
         // Explicit mapping
         Object.entries(fieldMapping).forEach(([formField, dbField]) => {
             if (body[formField]) {
-                contactData[dbField] = body[formField];
+                const camelField = dbField.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+                contactData[camelField] = body[formField];
             }
         });
 
@@ -89,18 +83,20 @@ export async function POST(request: Request) {
         if (Object.keys(fieldMapping).length === 0) {
             basicFields.forEach(field => {
                 const val = body[field] || body[field.replace('_', '')] || body[field.replace('_', ' ')];
-                if (val) contactData[field] = val;
+                if (val) {
+                    const camelField = field.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+                    contactData[camelField] = val;
+                }
             });
         }
 
         // 7. Insert Contact
-        const { data: contact, error: insertError } = await supabase
-            .from("contacts")
-            .insert(contactData)
-            .select()
-            .single();
-
-        if (insertError) {
+        let contact;
+        try {
+            contact = await prisma.contact.create({
+                data: contactData as any
+            });
+        } catch (insertError: any) {
             console.error("Web Lead Insert Error:", insertError);
             return NextResponse.json(
                 { error: `Failed to process lead: ${insertError.message}` },
@@ -109,28 +105,32 @@ export async function POST(request: Request) {
         }
 
         // 8. Create Notification for Admins
-        const { data: admins } = await supabase
-            .from("profiles")
-            .select("user_id")
-            .eq("organization_id", form.organization_id)
-            .in("role", ["admin", "manager"]);
+        const admins = await prisma.profile.findMany({
+            where: {
+                organizationId: form.organizationId,
+                role: { in: ["admin", "manager"] }
+            },
+            select: { userId: true }
+        });
 
-        if (admins) {
+        if (admins.length > 0) {
             const notifs = admins.map(a => ({
-                organization_id: form.organization_id,
-                user_id: a.user_id,
+                organizationId: form.organizationId,
+                userId: a.userId,
                 title: "New Web Lead",
-                message: `${contact.first_name} ${contact.last_name || ""} from ${form.name}`,
+                message: `${contact.firstName} ${contact.lastName || ""} from ${form.name}`,
                 type: "lead",
                 link: `/dashboard/contacts/${contact.id}`
             }));
-            await supabase.from("notifications").insert(notifs);
+            await prisma.notification.createMany({
+                data: notifs as any
+            });
         }
 
         // 9. Trigger Automation
         try {
             const { evaluateTriggers } = require("@/lib/automations/engine");
-            await evaluateTriggers("lead_created", form.organization_id, {
+            await evaluateTriggers("lead_created", form.organizationId, {
                 contactId: contact.id,
                 formId: form.id,
                 ...body
@@ -140,8 +140,8 @@ export async function POST(request: Request) {
         }
 
         // 10. Response / Redirect
-        if (form.redirect_url) {
-            return NextResponse.redirect(new URL(form.redirect_url), 302);
+        if (form.redirectUrl) {
+            return NextResponse.redirect(new URL(form.redirectUrl), 302);
         }
 
         return NextResponse.json({ success: true, id: contact.id }, { status: 200 });
@@ -165,7 +165,7 @@ export async function OPTIONS() {
     return new NextResponse(null, {
         status: 200,
         headers: {
-            "Access-Control-Allow-Origin": "*", // Or specific domains
+            "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, X-Form-ID",
         },

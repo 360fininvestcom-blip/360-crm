@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET(
     request: Request,
@@ -36,49 +37,37 @@ export async function GET(
 
 // Async background tracking function
 async function trackEmailClick(request: Request, emailId: string, destinationUrl: string) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) return;
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { autoRefreshToken: false, persistSession: false }
-    });
-
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const forwardedFor = request.headers.get('x-forwarded-for');
     const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : 'unknown';
 
-    // Log the click event
-    const { error: eventError } = await supabaseAdmin
-        .from('email_tracking_events')
-        .insert({
-            email_id: emailId,
-            event_type: 'click',
-            link_url: destinationUrl,
-            user_agent: userAgent,
-            ip_address: ipAddress
-        });
-
-    if (eventError) {
+    try {
+        // Log the click event
+        await prisma.$executeRaw`
+            INSERT INTO email_tracking_events (email_id, event_type, link_url, user_agent, ip_address)
+            VALUES (CAST(${emailId} AS UUID), 'click', ${destinationUrl}, ${userAgent}, ${ipAddress})
+        `;
+    } catch (eventError) {
         console.error('Click tracking event insert error:', eventError);
         return;
     }
 
-    // Update email click counters
-    const { data: emailData } = await supabaseAdmin
-        .from('emails')
-        .select('click_count')
-        .eq('id', emailId)
-        .single();
+    try {
+        // Update email click counters
+        const emails: any[] = await prisma.$queryRaw`SELECT click_count FROM emails WHERE id = CAST(${emailId} AS UUID)`;
+        const emailData = emails[0];
 
-    if (emailData) {
-        await supabaseAdmin
-            .from('emails')
-            .update({
-                clicked_at: new Date().toISOString(),
-                click_count: (emailData.click_count || 0) + 1
-            })
-            .eq('id', emailId);
+        if (emailData) {
+            const clickedAt = new Date().toISOString();
+            const clickCount = (emailData.click_count || 0) + 1;
+            await prisma.$executeRaw`
+                UPDATE emails
+                SET clicked_at = CAST(${clickedAt} AS TIMESTAMPTZ),
+                    click_count = ${clickCount}
+                WHERE id = CAST(${emailId} AS UUID)
+            `;
+        }
+    } catch (updateError) {
+        console.error('Email stats update error:', updateError);
     }
 }

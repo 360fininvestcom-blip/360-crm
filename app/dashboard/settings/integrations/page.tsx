@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Code, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { getWebForms, createWebForm, deleteWebForm } from "@/actions/web-forms";
 import {
     Dialog,
     DialogContent,
@@ -28,7 +28,6 @@ import { WebForm } from "@/types";
 
 export default function WebFormsPage() {
     const router = useRouter();
-    const supabase = createClient();
     const [forms, setForms] = useState<WebForm[]>([]);
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(false);
@@ -41,12 +40,7 @@ export default function WebFormsPage() {
 
     const fetchForms = async () => {
         try {
-            const { data, error } = await supabase
-                .from("web_forms")
-                .select("*")
-                .order("created_at", { ascending: false });
-
-            if (error) throw error;
+            const data = await getWebForms();
             setForms(data || []);
         } catch (error) {
             console.error("Error fetching forms:", error);
@@ -60,31 +54,7 @@ export default function WebFormsPage() {
         if (!newFormName) return;
 
         try {
-            // Get current user's org
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("organization_id")
-                .eq("user_id", user.id)
-                .single();
-
-            if (!profile) return;
-
-            const { data, error } = await supabase
-                .from("web_forms")
-                .insert({
-                    organization_id: profile.organization_id,
-                    name: newFormName,
-                    source: newFormSource,
-                    status: "active",
-                    config: { email: "email", name: "first_name" } // Default mapping
-                })
-                .select()
-                .single();
-
-            if (error) throw error;
+            const data = await createWebForm(newFormName, newFormSource);
 
             setForms([data, ...forms]);
             setOpen(false);
@@ -99,8 +69,7 @@ export default function WebFormsPage() {
 
     const deleteForm = async (id: string) => {
         try {
-            const { error } = await supabase.from("web_forms").delete().eq("id", id);
-            if (error) throw error;
+            await deleteWebForm(id);
             setForms(forms.filter((f) => f.id !== id));
             toast.success("Web form deleted");
         } catch (error) {

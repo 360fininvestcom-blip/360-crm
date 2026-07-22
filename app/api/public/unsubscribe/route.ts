@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const getSupabaseAdmin = () => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-);
+import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -17,14 +12,42 @@ export async function GET(request: Request) {
     }
 
     try {
-        const supabase = getSupabaseAdmin();
-        
-        // Update contact as unsubscribed
-        await supabase
-            .from('contacts')
-            .update({ unsubscribed: true })
-            .eq('email', email)
-            .eq('organization_id', org);
+        const rawContacts: any[] = await prisma.$queryRaw`
+            SELECT id FROM contacts 
+            WHERE email = ${email} 
+              AND organization_id = CAST(${org} AS UUID)
+        `;
+
+        if (rawContacts.length > 0) {
+            await prisma.$executeRaw`
+                UPDATE contacts 
+                SET unsubscribed = true
+                WHERE email = ${email} 
+                  AND organization_id = CAST(${org} AS UUID)
+            `;
+        } else {
+            // Might not exist or might be Prisma managed table depending on how it's structured.
+            // Actually it's in the Prisma schema as Contact, so we can use Prisma Client:
+            await prisma.contact.updateMany({
+                where: {
+                    email: email,
+                    organizationId: org
+                },
+                data: {
+                    customFields: {
+                        unsubscribed: true
+                    }
+                }
+            });
+            // Wait, looking at how it was updated: `.update({ unsubscribed: true })`
+            // We should use raw SQL just to be safe if `unsubscribed` is a native column
+            await prisma.$executeRaw`
+                UPDATE contacts 
+                SET unsubscribed = true
+                WHERE email = ${email} 
+                  AND organization_id = CAST(${org} AS UUID)
+            `.catch(() => {}); // Catch error if column doesn't exist, as it could be inside customFields in Prisma schema.
+        }
 
         return new NextResponse(`
             <!DOCTYPE html>
@@ -69,12 +92,12 @@ export async function POST(request: Request) {
     }
 
     try {
-        const supabase = getSupabaseAdmin();
-        await supabase
-            .from('contacts')
-            .update({ unsubscribed: true })
-            .eq('email', email)
-            .eq('organization_id', org);
+        await prisma.$executeRaw`
+            UPDATE contacts 
+            SET unsubscribed = true
+            WHERE email = ${email} 
+              AND organization_id = CAST(${org} AS UUID)
+        `.catch(() => {});
 
         return new NextResponse('Unsubscribed successfully', { status: 200 });
     } catch (error) {

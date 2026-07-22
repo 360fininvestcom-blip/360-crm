@@ -65,7 +65,7 @@ import type { Contact } from "@/types";
 import { useDialerStore } from "@/lib/stores";
 import { UserCheck, Play, MessageSquare } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls"; // Helper
-import { createClient } from "@/lib/supabase/client"; // Direct fetching for bulk ops
+import { getAllContactsForExport, getContactsForAutoDialer, getContactsByIds } from "@/actions/contacts";
 
 // Organization ID from authenticated profile
 
@@ -234,17 +234,13 @@ export default function ContactsPage() {
         // If "Select All" is active or we have more selections than current page
         if (isSelectAllMatching || selectedContacts.length > contacts.length) {
             toast.info("Preparing export...");
-            // Simple fetch all for now
-            const supabase = createClient();
-            let query = supabase.from('contacts').select('*');
-
-            if (effectiveOwnerId) {
-                query = query.eq('owner_id', effectiveOwnerId);
+            try {
+                const data = await getAllContactsForExport(effectiveOwnerId);
+                if (data) exportData = data;
+            } catch (error) {
+                toast.error("Failed to fetch export data");
+                return;
             }
-
-            const { data } = await query;
-            // Apply client filters if needed or trust user just wants "All"
-            if (data) exportData = data;
         }
 
         const headers = ["first_name", "last_name", "email", "phone", "company", "status", "lead_score"];
@@ -361,28 +357,20 @@ export default function ContactsPage() {
         if (isSelectAllMatching) {
             // Fetch everything matching filters
             toast.info(`Fetching all ${totalItems} contacts for Auto-Dialer...`);
-            const supabase = createClient();
-            let query = supabase.from("contacts").select("first_name, last_name, phone");
-
-            if (filters.search) {
-                query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
-            }
-            if (filters.status && filters.status !== "all") {
-                query = query.eq("status", filters.status);
-            }
-            if (effectiveOwnerId) {
-                query = query.eq("owner_id", effectiveOwnerId);
-            }
-
-            const { data, error } = await query;
-            if (error) {
+            try {
+                const data = await getContactsForAutoDialer({
+                    search: filters.search,
+                    status: filters.status,
+                    ownerId: effectiveOwnerId
+                });
+                
+                queue = (data || [])
+                    .filter(c => c.phone)
+                    .map(c => ({ number: c.phone!, name: `${c.first_name} ${c.last_name || ''}`.trim() }));
+            } catch (error) {
                 toast.error("Failed to fetch contacts");
                 return;
             }
-
-            queue = (data || [])
-                .filter(c => c.phone)
-                .map(c => ({ number: c.phone!, name: `${c.first_name} ${c.last_name || ''}`.trim() }));
 
         } else {
             // Manual Selection (possibly across pages)
@@ -398,12 +386,12 @@ export default function ContactsPage() {
 
             if (missingIds.length > 0) {
                 toast.info(`Fetching ${missingIds.length} off-screen contacts...`);
-                const supabase = createClient();
-                const { data } = await supabase
-                    .from("contacts")
-                    .select("first_name, last_name, phone")
-                    .in("id", missingIds);
-                if (data) missingContacts = data;
+                try {
+                    const data = await getContactsByIds(missingIds);
+                    if (data) missingContacts = data;
+                } catch (error) {
+                    toast.error("Failed to fetch missing contacts");
+                }
             }
 
             const allContacts = [...visibleSelected, ...missingContacts];

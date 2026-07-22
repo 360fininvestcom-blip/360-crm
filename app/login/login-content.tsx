@@ -9,12 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { ClientMotionSSR as ClientMotion } from "@/components/landing/client-motion-ssr";
 
 export default function LoginContent() {
     const router = useRouter();
-    const supabase = createClient();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +23,7 @@ export default function LoginContent() {
         setIsLoading(true);
 
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await authClient.signIn.email({
                 email,
                 password,
             });
@@ -34,7 +33,7 @@ export default function LoginContent() {
                 return;
             }
 
-            if (data.user) {
+            if (data?.user) {
                 toast.success("Welcome back!");
                 router.push("/dashboard");
                 router.refresh();
@@ -48,11 +47,9 @@ export default function LoginContent() {
     };
 
     const handleGoogleLogin = async () => {
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { error } = await authClient.signIn.social({
             provider: "google",
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-            },
+            callbackURL: `${window.location.origin}/dashboard`,
         });
         if (error) {
             toast.error(error.message);

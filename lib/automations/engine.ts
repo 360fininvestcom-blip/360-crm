@@ -1,14 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
 import { Workflow, Contact } from "@/types";
 import { AIProviderKeys } from "@/lib/ai-services";
 import { Node as RFNode, Edge } from "reactflow";
 import { sendEmail } from "@/lib/email-service";
-
-const getSupabaseAdmin = () => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-);
+import { Prisma } from '@prisma/client';
 
 export interface WorkflowRun {
     id: string;
@@ -26,17 +21,20 @@ export async function processWorkflowRun(runId: string, depth = 0) {
     if (depth > 5) return; // Prevent infinite loops
 
     // 1. Fetch Run and Workflow
-    const { data: run, error: runError } = await getSupabaseAdmin()
-        .from('workflow_runs')
-        .select(`
-            *,
-            workflow:workflows(*),
-            contact:contacts(*)
-        `)
-        .eq('id', runId)
-        .single();
+    const runs: any[] = await prisma.$queryRaw`
+        SELECT wr.*, 
+               json_build_object('id', w.id, 'nodes', w.nodes, 'edges', w.edges) as workflow,
+               json_build_object('id', c.id, 'email', c.email, 'first_name', c.first_name, 'last_name', c.last_name, 'tags', c.tags) as contact
+        FROM workflow_runs wr
+        JOIN workflows w ON wr.workflow_id = w.id
+        JOIN contacts c ON wr.contact_id = c.id
+        WHERE wr.id = CAST(${runId} AS UUID)
+        LIMIT 1
+    `;
 
-    if (runError || !run) {
+    const run = runs[0];
+
+    if (!run) {
         await logExecution(null, null, 'error', 'Workflow run not found: ' + runId);
         return;
     }
@@ -128,30 +126,52 @@ export async function processWorkflowRun(runId: string, depth = 0) {
 }
 
 async function logExecution(run: WorkflowRun | null, nodeId: string | null, level: string, message: string) {
-    await getSupabaseAdmin().from('workflow_logs').insert({
-        organization_id: run?.organization_id,
-        workflow_id: run?.workflow_id,
-        run_id: run?.id,
-        node_id: nodeId,
-        level,
-        message
-    });
+    if (!run) return;
+    await prisma.$executeRaw`
+        INSERT INTO workflow_logs (organization_id, workflow_id, run_id, node_id, level, message, created_at)
+        VALUES (
+            CAST(${run.organization_id} AS UUID),
+            CAST(${run.workflow_id} AS UUID),
+            CAST(${run.id} AS UUID),
+            ${nodeId},
+            ${level},
+            ${message},
+            CAST(${new Date().toISOString()} AS TIMESTAMPTZ)
+        )
+    `;
 }
 
 async function markRunStatus(runId: string, status: string, updates: Record<string, unknown> = {}) {
-    await getSupabaseAdmin().from('workflow_runs').update({
-        status,
-        ...updates,
-        last_executed_at: new Date().toISOString()
-    }).eq('id', runId);
+    const setClauses = [];
+    const values = [];
+    let i = 1;
+    for (const [key, value] of Object.entries(updates)) {
+        if (key === 'metadata') {
+            setClauses.push(Prisma.sql`${Prisma.raw(key)} = ${Prisma.sql`${value}::jsonb`}`);
+        } else if (key === 'next_execution_at') {
+            setClauses.push(Prisma.sql`${Prisma.raw(key)} = CAST(${value} AS TIMESTAMPTZ)`);
+        } else {
+            setClauses.push(Prisma.sql`${Prisma.raw(key)} = ${value}`);
+        }
+    }
+    setClauses.push(Prisma.sql`status = ${status}`);
+    setClauses.push(Prisma.sql`last_executed_at = CAST(${new Date().toISOString()} AS TIMESTAMPTZ)`);
+
+    await prisma.$executeRaw`
+        UPDATE workflow_runs
+        SET ${Prisma.join(setClauses, ', ')}
+        WHERE id = CAST(${runId} AS UUID)
+    `;
 }
 
 async function advanceWorkflow(runId: string, nodeId: string, depth: number) {
-    await getSupabaseAdmin().from('workflow_runs').update({
-        current_node_id: nodeId,
-        status: 'running',
-        next_execution_at: new Date().toISOString()
-    }).eq('id', runId);
+    await prisma.$executeRaw`
+        UPDATE workflow_runs
+        SET current_node_id = ${nodeId},
+            status = 'running',
+            next_execution_at = CAST(${new Date().toISOString()} AS TIMESTAMPTZ)
+        WHERE id = CAST(${runId} AS UUID)
+    `;
 
     await processWorkflowRun(runId, depth);
 }
@@ -175,9 +195,6 @@ async function executeEmailAction(run: WorkflowRun, node: RFNode) {
     const templateId = node.data.templateId as string;
     if (!templateId) throw new Error('No template selected');
 
-    // Using the same logic as the existing API route but cleaned up
-    // Assuming sendEmail in lib/email-service handles the SMTP lookup internally
-    // If not, we'd replicate the smtp lookup here.
     await sendEmail({
         to: contact.email,
         templateId,
@@ -214,36 +231,40 @@ async function executeGeneralAction(run: WorkflowRun, node: RFNode) {
         
         const currentTags = run.contact.tags || [];
         if (!currentTags.includes(tag)) {
-            await getSupabaseAdmin().from('contacts')
-                .update({ tags: [...currentTags, tag] })
-                .eq('id', run.contact_id);
+            const newTags = [...currentTags, tag];
+            await prisma.$executeRaw`
+                UPDATE contacts
+                SET tags = array[${Prisma.join(newTags)}]
+                WHERE id = CAST(${run.contact_id} AS UUID)
+            `;
             await logExecution(run, node.id, 'info', `Added tag: ${tag}`);
         }
     } 
     else if (actionType === 'calculate_score') {
-        const { data: activities } = await getSupabaseAdmin()
-            .from('activities')
-            .select('*')
-            .eq('contact_id', run.contact_id)
-            .order('created_at', { ascending: false })
-            .limit(20);
+        const activities: any[] = await prisma.$queryRaw`
+            SELECT * FROM activities
+            WHERE contact_id = CAST(${run.contact_id} AS UUID)
+            ORDER BY created_at DESC
+            LIMIT 20
+        `;
 
-        const { data: apiKeys } = await getSupabaseAdmin()
-            .from('api_keys')
-            .select('*')
-            .eq('organization_id', run.organization_id)
-            .single();
+        const apiKeysRecords: any[] = await prisma.$queryRaw`
+            SELECT * FROM api_keys
+            WHERE organization_id = CAST(${run.organization_id} AS UUID)
+            LIMIT 1
+        `;
+        const apiKeys = apiKeysRecords[0];
 
         if (apiKeys) {
             const { generateContactScore } = await import('@/lib/ai-services');
             const result = await generateContactScore(run.contact as unknown as Record<string, unknown>, activities || [], apiKeys as unknown as AIProviderKeys);
             if (result) {
-                await getSupabaseAdmin().from('contacts')
-                    .update({
-                        lead_score: result.score,
-                        score_reason: result.reason
-                    })
-                    .eq('id', run.contact_id);
+                await prisma.$executeRaw`
+                    UPDATE contacts
+                    SET lead_score = ${result.score},
+                        score_reason = ${result.reason}
+                    WHERE id = CAST(${run.contact_id} AS UUID)
+                `;
                 await logExecution(run, node.id, 'info', `AI Lead Score updated: ${result.score}`);
             }
         } else {
@@ -261,23 +282,23 @@ async function executeGeneralAction(run: WorkflowRun, node: RFNode) {
             return;
         }
 
-        const { error: notifError } = await getSupabaseAdmin()
-            .from('notifications')
-            .insert({
-                user_id: userId,
-                organization_id: run.organization_id,
-                title,
-                message,
-                type: 'system',
-                link_url: `/dashboard/contacts/${run.contact_id}`,
-                read: false
-            });
-
-        if (notifError) {
-            await logExecution(run, node.id, 'error', `Failed to send notification: ${notifError.message}`);
-        } else {
-            await logExecution(run, node.id, 'info', `Sent notification to user ${userId}`);
-        }
+        await prisma.$executeRaw`
+            INSERT INTO notifications (user_id, organization_id, title, message, type, link_url, read, created_at)
+            VALUES (
+                CAST(${userId} AS UUID),
+                CAST(${run.organization_id} AS UUID),
+                ${title},
+                ${message},
+                'system',
+                ${`/dashboard/contacts/${run.contact_id}`},
+                false,
+                CAST(${new Date().toISOString()} AS TIMESTAMPTZ)
+            )
+        `.catch(notifError => {
+            logExecution(run, node.id, 'error', `Failed to send notification: ${notifError.message}`);
+        }).then(() => {
+            logExecution(run, node.id, 'info', `Sent notification to user ${userId}`);
+        });
     }
     else if (actionType === 'update_stage') {
         const stage = node.data.stage as string;
@@ -287,29 +308,23 @@ async function executeGeneralAction(run: WorkflowRun, node: RFNode) {
         }
         
         // Find the most recent deal for this contact to update its stage
-        const { data: deals, error: dealError } = await getSupabaseAdmin()
-            .from('deals')
-            .select('id')
-            .eq('contact_id', run.contact_id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-        if (dealError) {
-            await logExecution(run, node.id, 'error', `Failed to fetch deals: ${dealError.message}`);
-            return;
-        }
+        const deals: any[] = await prisma.$queryRaw`
+            SELECT id FROM deals
+            WHERE contact_id = CAST(${run.contact_id} AS UUID)
+            ORDER BY created_at DESC
+            LIMIT 1
+        `;
 
         if (deals && deals.length > 0) {
-            const { error: updateError } = await getSupabaseAdmin()
-                .from('deals')
-                .update({ stage })
-                .eq('id', deals[0].id);
-            
-            if (updateError) {
-                await logExecution(run, node.id, 'error', `Failed to update deal stage: ${updateError.message}`);
-            } else {
-                await logExecution(run, node.id, 'info', `Updated deal ${deals[0].id} stage to: ${stage}`);
-            }
+            await prisma.$executeRaw`
+                UPDATE deals
+                SET stage = ${stage}
+                WHERE id = CAST(${deals[0].id} AS UUID)
+            `.catch(updateError => {
+                logExecution(run, node.id, 'error', `Failed to update deal stage: ${updateError.message}`);
+            }).then(() => {
+                logExecution(run, node.id, 'info', `Updated deal ${deals[0].id} stage to: ${stage}`);
+            });
         } else {
             await logExecution(run, node.id, 'warn', 'No deals found for contact to update stage');
         }
@@ -321,26 +336,25 @@ async function executeGeneralAction(run: WorkflowRun, node: RFNode) {
             return;
         }
 
-        const { error: updateError } = await getSupabaseAdmin()
-            .from('contacts')
-            .update({ owner_id: ownerId })
-            .eq('id', run.contact_id);
-        
-        if (updateError) {
-             await logExecution(run, node.id, 'error', `Failed to assign owner: ${updateError.message}`);
-        } else {
-            await logExecution(run, node.id, 'info', `Assigned contact owner to: ${ownerId}`);
-        }
+        await prisma.$executeRaw`
+            UPDATE contacts
+            SET owner_id = CAST(${ownerId} AS UUID)
+            WHERE id = CAST(${run.contact_id} AS UUID)
+        `.catch(updateError => {
+             logExecution(run, node.id, 'error', `Failed to assign owner: ${updateError.message}`);
+        }).then(() => {
+            logExecution(run, node.id, 'info', `Assigned contact owner to: ${ownerId}`);
+        });
     }
 }
 
 export async function evaluateTriggers(triggerType: string, organizationId: string, payload: { contactId: string; [key: string]: unknown }) {
     // 1. Fetch active workflows for this trigger
-    const { data: workflows } = await getSupabaseAdmin()
-        .from('workflows')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true);
+    const workflows: any[] = await prisma.$queryRaw`
+        SELECT * FROM workflows
+        WHERE organization_id = CAST(${organizationId} AS UUID)
+          AND is_active = true
+    `;
 
     if (!workflows || workflows.length === 0) return;
 
@@ -356,22 +370,25 @@ export async function evaluateTriggers(triggerType: string, organizationId: stri
         }
 
         // 2. Create Workflow Run
-        const { data: run, error: runError } = await getSupabaseAdmin()
-            .from('workflow_runs')
-            .insert({
-                organization_id: organizationId,
-                workflow_id: workflow.id,
-                contact_id: payload.contactId,
-                status: 'waiting', // Start waiting so the Cron can cleanly pick it up, or process it immediately below
-                metadata: { trigger_payload: payload }
-            })
-            .select()
-            .single();
-
-        if (run && !runError) {
+        try {
+            const runs: any[] = await prisma.$queryRaw`
+                INSERT INTO workflow_runs (organization_id, workflow_id, contact_id, status, metadata, created_at, updated_at)
+                VALUES (
+                    CAST(${organizationId} AS UUID),
+                    CAST(${workflow.id} AS UUID),
+                    CAST(${payload.contactId} AS UUID),
+                    'waiting',
+                    ${Prisma.sql`${{ trigger_payload: payload }}::jsonb`},
+                    CAST(${new Date().toISOString()} AS TIMESTAMPTZ),
+                    CAST(${new Date().toISOString()} AS TIMESTAMPTZ)
+                )
+                RETURNING id
+            `;
+            const run = runs[0];
+            
             // 3. Start processing immediately for the first node
             await processWorkflowRun(run.id, 0);
-        } else if (runError) {
+        } catch (runError) {
              console.error("Failed to insert workflow run:", runError);
         }
     }

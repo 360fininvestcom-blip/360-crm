@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { getOrganizationApiKeys, createOrganizationApiKey, deleteOrganizationApiKey, getCrmApiKey, updateCrmApiKey } from "@/actions/developer";
 import {
     Dialog,
     DialogContent,
@@ -36,7 +36,6 @@ interface ApiKey {
 }
 
 export default function DeveloperSettingsPage() {
-    const supabase = createClient();
     const [keys, setKeys] = useState<ApiKey[]>([]);
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(false);
@@ -55,26 +54,9 @@ export default function DeveloperSettingsPage() {
 
     const fetchCrmKey = async () => {
         try {
-            const { data: profile } = await supabase.auth.getUser();
-            if (!profile.user) return;
-            
-            // Get organization_id from profiles
-            const { data: profileData } = await supabase
-                .from("profiles")
-                .select("organization_id")
-                .eq("user_id", profile.user.id)
-                .single();
-                
-            if (!profileData) return;
-
-            const { data } = await supabase
-                .from("api_keys")
-                .select("crm_api_key")
-                .eq("organization_id", profileData.organization_id)
-                .single();
-
-            if (data?.crm_api_key) {
-                setCrmApiKey(data.crm_api_key);
+            const key = await getCrmApiKey();
+            if (key) {
+                setCrmApiKey(key);
             }
         } catch (e) {
             console.error("Error fetching CRM key:", e);
@@ -83,12 +65,7 @@ export default function DeveloperSettingsPage() {
 
     const fetchKeys = async () => {
         try {
-            const { data, error } = await supabase
-                .from("organization_api_keys")
-                .select("*")
-                .order("created_at", { ascending: false });
-
-            if (error) throw error;
+            const data = await getOrganizationApiKeys();
             setKeys(data || []);
         } catch (error) {
             console.error("Error fetching keys:", error);
@@ -102,14 +79,7 @@ export default function DeveloperSettingsPage() {
         if (!newLabel) return;
 
         try {
-            const res = await fetch("/api/settings/api-keys", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ label: newLabel })
-            });
-            const data = await res.json();
-
-            if (!res.ok) throw new Error(data.error || "Failed to create key");
+            const data = await createOrganizationApiKey(newLabel);
 
             setGeneratedKey(data.apiKey);
             // Refresh list
@@ -124,10 +94,7 @@ export default function DeveloperSettingsPage() {
     const deleteKey = async (id: string) => {
         if (!confirm("Are you sure? This will immediately revoke access for this key.")) return;
         try {
-            const res = await fetch(`/api/settings/api-keys?id=${id}`, {
-                method: "DELETE"
-            });
-            if (!res.ok) throw new Error("Failed to revoke");
+            await deleteOrganizationApiKey(id);
 
             setKeys(keys.filter((k) => k.id !== id));
             toast.success("API Key revoked");
@@ -144,17 +111,7 @@ export default function DeveloperSettingsPage() {
     const updateCrmKey = async () => {
         setIsUpdatingCrmKey(true);
         try {
-            const res = await fetch("/api/settings/crm-key", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ apiKey: crmApiKey })
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || "Failed to update CRM Key");
-            }
-
+            await updateCrmApiKey(crmApiKey);
             toast.success("CRM API Key updated");
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Failed to update CRM Key";

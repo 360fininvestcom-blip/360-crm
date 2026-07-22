@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { sendEmail } from '@/lib/email-service';
+import { prisma } from '@/lib/prisma';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
+import { Prisma } from '@prisma/client';
 
 export async function POST(request: Request) {
     try {
@@ -12,71 +13,69 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 });
         }
 
-        const cookieStore = await cookies();
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    get(name: string) {
-                        return cookieStore.get(name)?.value;
-                    },
-                },
-            }
-        );
-
-        // 1. Get User Session
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+        
+        if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         // 2. Get User Organization
-        const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("organization_id")
-            .eq("user_id", user.id)
-            .single();
+        const profile = await prisma.profile.findUnique({
+            where: { userId: session.user.id },
+            select: { organizationId: true }
+        });
 
-        if (profileError || !profile) {
+        if (!profile || !profile.organizationId) {
             return NextResponse.json({ error: "Profile/Organization not found" }, { status: 404 });
         }
 
-        const orgId = profile.organization_id;
+        const orgId = profile.organizationId;
 
         // Resolve Contacts
-        let contacts: { id: string, email: string, first_name: string, last_name: string, organization_id: string }[] = [];
+        let contacts: { id: string, email: string | null, firstName: string, lastName: string | null, organizationId: string }[] = [];
 
         if (isSelectAllMatching) {
-            let query = supabase
-                .from('contacts')
-                .select('id, email, first_name, last_name, organization_id')
-                .eq('organization_id', orgId);
+            const where: Prisma.ContactWhereInput = {
+                organizationId: orgId
+            };
+            
             if (filters?.search) {
-                query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
+                where.OR = [
+                    { firstName: { contains: filters.search, mode: 'insensitive' } },
+                    { lastName: { contains: filters.search, mode: 'insensitive' } },
+                    { email: { contains: filters.search, mode: 'insensitive' } },
+                    { company: { contains: filters.search, mode: 'insensitive' } }
+                ];
             }
             if (filters?.status && filters.status !== "all") {
-                query = query.eq('status', filters.status);
+                where.customFields = {
+                    path: ['status'],
+                    equals: filters.status
+                };
             }
             if (filters?.ownerId && filters.ownerId !== "all") {
-                query = query.eq('owner_id', filters.ownerId);
+                where.ownerId = filters.ownerId;
             }
 
-            const { data, error } = await query;
-            if (error) throw error;
-            contacts = data || [];
+            const data = await prisma.contact.findMany({
+                where,
+                select: { id: true, email: true, firstName: true, lastName: true, organizationId: true }
+            });
+            contacts = data;
         } else {
             if (!contactIds || contactIds.length === 0) {
                 return NextResponse.json({ error: 'No contacts specified' }, { status: 400 });
             }
-            const { data, error } = await supabase
-                .from('contacts')
-                .select('id, email, first_name, last_name, organization_id')
-                .in('id', contactIds)
-                .eq('organization_id', orgId);
-
-            if (error) throw error;
-            contacts = data || [];
+            const data = await prisma.contact.findMany({
+                where: {
+                    id: { in: contactIds },
+                    organizationId: orgId
+                },
+                select: { id: true, email: true, firstName: true, lastName: true, organizationId: true }
+            });
+            contacts = data;
         }
 
         contacts = contacts.filter(c => !!c.email);
@@ -90,8 +89,8 @@ export async function POST(request: Request) {
             let finalBody = body;
             
             const variables: Record<string, string> = {
-                first_name: contact.first_name || 'there',
-                last_name: contact.last_name || ''
+                first_name: contact.firstName || 'there',
+                last_name: contact.lastName || ''
             };
 
             Object.entries(variables).forEach(([key, value]) => {
@@ -102,7 +101,7 @@ export async function POST(request: Request) {
 
             return {
                 organization_id: orgId,
-                to_email: contact.email,
+                to_email: contact.email!,
                 subject: finalSubject,
                 body_html: finalBody,
                 contact_id: contact.id,
@@ -111,10 +110,14 @@ export async function POST(request: Request) {
         });
 
         if (queuePayloads.length > 0) {
-            const { error: insertError } = await supabase.from('email_queue').insert(queuePayloads);
-            if (insertError) {
-                console.error("Queue insert error:", insertError);
-                throw insertError;
+            // Note: If you don't have an email_queue model in Prisma schema, you might need to use raw SQL
+            // Wait, does email_queue exist in Prisma? It doesn't seem to be in schema.prisma.
+            // Let's use $executeRaw for the queue insert.
+            for (const payload of queuePayloads) {
+                await prisma.$executeRaw`
+                    INSERT INTO email_queue (organization_id, to_email, subject, body_html, contact_id, status)
+                    VALUES (CAST(${payload.organization_id} AS UUID), ${payload.to_email}, ${payload.subject}, ${payload.body_html}, CAST(${payload.contact_id} AS UUID), ${payload.status})
+                `;
             }
         }
 

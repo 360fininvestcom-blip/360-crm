@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, Mail, MailOpen, MousePointerClick } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { getEmailMetrics } from "@/actions/email";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from "recharts";
 
 export function EmailAnalytics() {
@@ -21,13 +21,7 @@ export function EmailAnalytics() {
 
     useEffect(() => {
         const fetchMetrics = async () => {
-            const supabase = createClient();
-
-            // Fetch all sent emails
-            const { data: emails } = await supabase
-                .from('emails')
-                .select('id, opens_count, clicks_count, received_at')
-                .eq('folder', 'sent');
+            const emails = await getEmailMetrics();
 
             if (emails) {
                 const totalSent = emails.length;

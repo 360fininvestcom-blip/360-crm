@@ -1,27 +1,18 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { Node as RFNode, Edge } from "reactflow";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
-        }
-    );
-
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+        
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const body = await request.json();
         const { contactId, nodes, edges } = body as { contactId: string; nodes: RFNode[]; edges: Edge[] };
@@ -31,13 +22,11 @@ export async function POST(request: Request) {
         }
 
         // Fetch contact details for evaluating conditions
-        const { data: contact, error: contactError } = await supabase
-            .from('contacts')
-            .select('*')
-            .eq('id', contactId)
-            .single();
+        const contact = await prisma.contact.findUnique({
+            where: { id: contactId }
+        });
 
-        if (contactError || !contact) {
+        if (!contact) {
             return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
         }
 
@@ -48,7 +37,7 @@ export async function POST(request: Request) {
         };
 
         // Start execution loop
-        addLog('Start', 'info', `Starting test run for contact ${contact.first_name} ${contact.last_name || ''} (${contact.email || 'No email'})`);
+        addLog('Start', 'info', `Starting test run for contact ${contact.firstName} ${contact.lastName || ''} (${contact.email || 'No email'})`);
 
         let currentNode = nodes.find(n => n.type === 'trigger');
         if (!currentNode) {

@@ -1,29 +1,22 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { decrypt } from '@/lib/crypto';
 import { injectTracking } from '@/lib/email-tracking';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-      },
-    }
-  );
+  const session = await auth.api.getSession({
+    headers: await headers()
+  });
 
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  
+  const user = session.user;
 
   try {
     const { to, subject, body_html, account_id } = await request.json();
@@ -33,55 +26,56 @@ export async function POST(request: Request) {
     }
 
     // Fetch account details
-    const { data: account, error: accountError } = await supabase
-      .from('smtp_configs')
-      .select('*')
-      .eq('id', account_id)
-      .single();
+    const account = await prisma.smtpConfig.findUnique({
+      where: { id: account_id }
+    });
 
-    if (accountError || !account) {
+    if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
     // Decrypt credentials
-    const password = decrypt(account.smtp_pass_encrypted);
+    const password = decrypt(account.passwordEncrypted);
 
     // 1. Create Email Record first to get the ID for tracking
-    const { data: emailRecord, error: emailError } = await supabase
-      .from('emails')
-      .insert({
-        account_id: account.id,
-        organization_id: account.organization_id,
-        from_addr: account.email_addr,
-        to_addr: to,
-        subject,
-        body_html,
-        folder: 'sent',
-        is_read: true,
-        received_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    // We don't have an `Email` model in prisma, so using raw SQL for `emails` table.
+    const emailId = uuidv4();
+    const receivedAt = new Date().toISOString();
 
-    if (emailError) {
-      console.error('Failed to pre-log email:', emailError);
-      return NextResponse.json({ error: 'Failed to initialize email tracking' }, { status: 500 });
-    }
+    await prisma.$executeRaw`
+      INSERT INTO emails (id, account_id, organization_id, from_addr, to_addr, subject, body_html, folder, is_read, received_at)
+      VALUES (
+        CAST(${emailId} AS UUID), 
+        CAST(${account.id} AS UUID), 
+        CAST(${account.organizationId} AS UUID), 
+        ${account.fromEmail || account.username}, 
+        ${to}, 
+        ${subject}, 
+        ${body_html}, 
+        'sent', 
+        true, 
+        CAST(${receivedAt} AS TIMESTAMPTZ)
+      )
+    `;
 
     // 2. Inject Tracking
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const trackedBody = injectTracking(body_html, emailRecord.id, baseUrl);
+    const trackedBody = injectTracking(body_html, emailId, baseUrl);
 
     // Update the record with tracked body
-    await supabase.from('emails').update({ body_html: trackedBody }).eq('id', emailRecord.id);
+    await prisma.$executeRaw`
+      UPDATE emails 
+      SET body_html = ${trackedBody} 
+      WHERE id = CAST(${emailId} AS UUID)
+    `;
 
     // 3. Configure Nodemailer
     const transporter = nodemailer.createTransport({
-      host: account.smtp_host,
-      port: account.smtp_port,
-      secure: account.smtp_port === 465,
+      host: account.host,
+      port: account.port,
+      secure: account.port === 465,
       auth: {
-        user: account.smtp_user,
+        user: account.username,
         pass: password,
       },
       tls: {
@@ -91,19 +85,21 @@ export async function POST(request: Request) {
 
     // 4. Send email
     await transporter.sendMail({
-      from: `"${account.name || account.smtp_user}" <${account.email_addr || account.smtp_user}>`,
+      from: `"${account.fromName || account.username}" <${account.fromEmail || account.username}>`,
       to,
       subject,
       html: trackedBody,
     });
 
     // Also Log Activity
-    await supabase.from('activities').insert({
-      organization_id: account.organization_id,
-      type: 'email',
-      title: `Sent Email: ${subject}`,
-      description: `Sent to ${to}`,
-      created_by: user.id
+    await prisma.activity.create({
+      data: {
+        organizationId: account.organizationId,
+        type: 'email',
+        title: `Sent Email: ${subject}`,
+        description: `Sent to ${to}`,
+        createdById: user.id
+      }
     });
 
     return NextResponse.json({ success: true });
@@ -114,7 +110,6 @@ export async function POST(request: Request) {
       response: error.response,
       command: error.command
     });
-    console.log(`[DEBUG] Email send failed:`, error.message);
 
     let errorMessage = 'Failed to send email';
     if (error.code === 'EAUTH') {

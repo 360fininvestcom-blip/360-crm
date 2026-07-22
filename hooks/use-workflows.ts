@@ -2,32 +2,23 @@
 
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
-import { createClient } from "@/lib/supabase/client";
 import { useRealtime } from "./use-realtime";
 import type { Workflow } from "@/types";
-
-// const supabase = createClient(); // Moved inside functions for SSR safety
-
-// ============================================
-// FETCHERS
-// ============================================
-
-async function fetchWorkflows(): Promise<Workflow[]> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-        .from("workflows")
-        .select("*")
-        .order("updated_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-}
+import { 
+    getWorkflows, 
+    createWorkflow, 
+    updateWorkflow, 
+    deleteWorkflow 
+} from "@/actions/workflows";
 
 // ============================================
 // SWR HOOKS
 // ============================================
 
 export function useWorkflows() {
-    const swr = useSWR<Workflow[]>("workflows", fetchWorkflows, {
+    const swr = useSWR<Workflow[]>("workflows", async () => {
+        return await getWorkflows();
+    }, {
         revalidateOnFocus: false,
     });
 
@@ -44,14 +35,7 @@ export function useCreateWorkflow() {
     return useSWRMutation(
         "workflows",
         async (_, { arg }: { arg: Omit<Workflow, "id" | "created_at" | "updated_at"> }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("workflows")
-                .insert([arg])
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await createWorkflow(arg);
         }
     );
 }
@@ -60,15 +44,7 @@ export function useUpdateWorkflow() {
     return useSWRMutation(
         "workflows",
         async (_, { arg }: { arg: { id: string; updates: Partial<Workflow> } }) => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("workflows")
-                .update(arg.updates)
-                .eq("id", arg.id)
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
+            return await updateWorkflow(arg.id, arg.updates);
         }
     );
 }
@@ -77,12 +53,7 @@ export function useDeleteWorkflow() {
     return useSWRMutation(
         "workflows",
         async (_, { arg }: { arg: string }) => {
-            const supabase = createClient();
-            const { error } = await supabase
-                .from("workflows")
-                .delete()
-                .eq("id", arg);
-            if (error) throw error;
+            await deleteWorkflow(arg);
         }
     );
 }

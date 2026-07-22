@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 // Base64 encoded transparent 1x1 pixel GIF
 const PIXEL_BASE64 = 'R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
@@ -31,56 +32,39 @@ export async function GET(
 
 // Fire-and-forget background tracking
 async function trackEmailOpen(request: Request, emailId: string) {
-    // 1. Initialize Supabase Admin strictly for backend event tracking
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-        throw new Error('Missing Supabase credentials');
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { autoRefreshToken: false, persistSession: false }
-    });
-
     // 2. Extract metadata safely
     const userAgent = request.headers.get('user-agent') || 'unknown';
     // 'x-forwarded-for' is common in proxies/Vercel
     const forwardedFor = request.headers.get('x-forwarded-for');
     const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : 'unknown';
 
-    // 3. Insert tracking event
-    const { error: eventError } = await supabaseAdmin
-        .from('email_tracking_events')
-        .insert({
-            email_id: emailId,
-            event_type: 'open',
-            user_agent: userAgent,
-            ip_address: ipAddress
-        });
-
-    if (eventError) {
+    try {
+        // 3. Insert tracking event
+        await prisma.$executeRaw`
+            INSERT INTO email_tracking_events (email_id, event_type, user_agent, ip_address)
+            VALUES (CAST(${emailId} AS UUID), 'open', ${userAgent}, ${ipAddress})
+        `;
+    } catch (eventError) {
         console.error('Email tracking event insert error:', eventError);
         return; // Don't try to bump the counter if insert failed (could be invalid email_id)
     }
 
-    // 4. Update the email's statistics (atomically increment open count)
-    // Unfortunately Supabase REST doesn't have an easy atomic increment from JS without an RPC,
-    // so we'll fetch then update, or just use a stored procedure if we had one.
-    // For now, updating timestamp and grabbing current state is fine for MVP.
-    const { data: emailData } = await supabaseAdmin
-        .from('emails')
-        .select('open_count')
-        .eq('id', emailId)
-        .single();
+    try {
+        // 4. Update the email's statistics (atomically increment open count)
+        const emails: any[] = await prisma.$queryRaw`SELECT open_count FROM emails WHERE id = CAST(${emailId} AS UUID)`;
+        const emailData = emails[0];
 
-    if (emailData) {
-        await supabaseAdmin
-            .from('emails')
-            .update({
-                opened_at: new Date().toISOString(),
-                open_count: (emailData.open_count || 0) + 1
-            })
-            .eq('id', emailId);
+        if (emailData) {
+            const openedAt = new Date().toISOString();
+            const openCount = (emailData.open_count || 0) + 1;
+            await prisma.$executeRaw`
+                UPDATE emails
+                SET opened_at = CAST(${openedAt} AS TIMESTAMPTZ),
+                    open_count = ${openCount}
+                WHERE id = CAST(${emailId} AS UUID)
+            `;
+        }
+    } catch (updateError) {
+        console.error('Email stats update error:', updateError);
     }
 }

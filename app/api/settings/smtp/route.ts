@@ -1,69 +1,50 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { encrypt } from '@/lib/crypto';
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: Request) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
-        }
-    );
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+    
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: accounts, error } = await supabase
-        .from("smtp_configs")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(accounts);
+    try {
+        const accounts = await prisma.$queryRaw`
+            SELECT * FROM smtp_configs
+            ORDER BY created_at DESC
+        `;
+        return NextResponse.json(accounts);
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 }
 
 export async function POST(request: Request) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
-        }
-    );
-
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     try {
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+        
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const user = session.user;
+
         const { id, updates, orgId: providedOrgId } = await request.json();
 
         // 1. Get user org and role
-        const { data: profile, error: profError } = await supabase
-            .from('profiles')
-            .select('id, organization_id, role')
-            .eq('user_id', user.id)
-            .single();
+        const profile = await prisma.profile.findUnique({
+            where: { userId: user.id },
+            select: { id: true, organizationId: true, role: true }
+        });
 
-        if (profError || !profile) {
+        if (!profile) {
             return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
         }
 
-        const orgId = providedOrgId || profile.organization_id;
+        const orgId = providedOrgId || profile.organizationId;
 
         // 2. Security Check: Only admins/managers can add/edit shared accounts
         if (updates.is_org_wide && profile.role !== 'admin' && profile.role !== 'manager') {
@@ -81,31 +62,55 @@ export async function POST(request: Request) {
         }
 
         // 4. Upsert Logic
-        let result;
+        const updatedAt = new Date().toISOString();
+        let result = { id: id || undefined };
+
         if (id) {
             // Update
-            const { data, error } = await supabase
-                .from("smtp_configs")
-                .update({ ...updates, updated_at: new Date().toISOString() })
-                .eq("id", id)
-                .select()
-                .single();
-            if (error) throw error;
-            result = data;
+            const setClauses = [];
+            const values = [];
+            let i = 1;
+            for (const [key, value] of Object.entries(updates)) {
+                setClauses.push(Prisma.sql`${Prisma.raw(key)} = ${value}`);
+            }
+            setClauses.push(Prisma.sql`updated_at = CAST(${updatedAt} AS TIMESTAMPTZ)`);
+            
+            await prisma.$executeRaw`
+                UPDATE smtp_configs
+                SET ${Prisma.join(setClauses, ', ')}
+                WHERE id = CAST(${id} AS UUID)
+            `;
+
+            const updatedData = await prisma.$queryRaw`SELECT * FROM smtp_configs WHERE id = CAST(${id} AS UUID)`;
+            result = (updatedData as any[])[0];
         } else {
             // Insert
-            const { data, error } = await supabase
-                .from("smtp_configs")
-                .insert([{
-                    ...updates,
-                    organization_id: orgId,
-                    user_id: updates.is_org_wide ? null : profile.id, // Assign to user if not org-wide
-                    created_at: new Date().toISOString()
-                }])
-                .select()
-                .single();
-            if (error) throw error;
-            result = data;
+            const insertUpdates = {
+                ...updates,
+                organization_id: orgId,
+                user_id: updates.is_org_wide ? null : profile.id, // Assign to user if not org-wide
+                created_at: updatedAt,
+                updated_at: updatedAt
+            };
+
+            const columns = Object.keys(insertUpdates).map(k => Prisma.raw(k));
+            const values = Object.values(insertUpdates).map(v => {
+                // If it's the date string, cast it appropriately if needed, or just let PG handle it. But to be safe:
+                if (typeof v === 'string' && v === updatedAt) {
+                    return Prisma.sql`CAST(${v} AS TIMESTAMPTZ)`;
+                }
+                if (['organization_id', 'user_id'].includes(Object.keys(insertUpdates)[Object.values(insertUpdates).indexOf(v)])) {
+                    return v ? Prisma.sql`CAST(${v} AS UUID)` : null;
+                }
+                return v;
+            });
+            
+            const returned: any[] = await prisma.$queryRaw`
+                INSERT INTO smtp_configs (${Prisma.join(columns, ', ')})
+                VALUES (${Prisma.join(values, ', ')})
+                RETURNING *
+            `;
+            result = returned[0];
         }
 
         return NextResponse.json(result);
@@ -116,34 +121,27 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    try {
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get('id');
 
-    if (!id) {
-        return NextResponse.json({ error: 'ID is required' }, { status: 400 });
-    }
-
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
+        if (!id) {
+            return NextResponse.json({ error: 'ID is required' }, { status: 400 });
         }
-    );
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+        
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { error } = await supabase
-        .from("smtp_configs")
-        .delete()
-        .eq("id", id);
+        await prisma.$executeRaw`
+            DELETE FROM smtp_configs
+            WHERE id = CAST(${id} AS UUID)
+        `;
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 }

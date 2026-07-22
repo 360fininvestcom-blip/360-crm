@@ -41,7 +41,7 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { createClient } from "@/lib/supabase/client";
+import { getTestContacts } from "@/actions/contacts";
 import { Loader2 } from "lucide-react";
 
 // Initial node types
@@ -84,13 +84,8 @@ function BuilderInternal({ workflow }: WorkflowBuilderProps) {
             const fetchContacts = async () => {
                 setContactsLoading(true);
                 try {
-                    const supabase = createClient();
-                    const { data, error } = await supabase
-                        .from('contacts')
-                        .select('id, first_name, last_name, email')
-                        .order('first_name', { ascending: true })
-                        .limit(20);
-                    if (!error && data) {
+                    const data = await getTestContacts(20);
+                    if (data) {
                         setContacts(data);
                         if (data.length > 0) setSelectedContactId(data[0].id);
                     }

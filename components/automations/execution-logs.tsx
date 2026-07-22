@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { getWorkflowLogs } from '@/actions/workflows';
+import { pusherClient } from '@/lib/pusher-client';
 import {
     Table,
     TableBody,
@@ -27,36 +28,33 @@ interface Log {
 export function ExecutionLogs() {
     const [logs, setLogs] = useState<Log[]>([]);
     const [loading, setLoading] = useState(true);
-    const supabase = createClient();
 
     useEffect(() => {
         const fetchLogs = async () => {
-            const { data, error } = await supabase
-                .from('workflow_logs')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(50);
-
-            if (!error && data) {
+            try {
+                const data = await getWorkflowLogs();
                 setLogs(data);
+            } catch (err) {
+                console.error("Failed to fetch logs", err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         fetchLogs();
 
-        // Subscribe to real-time logs
-        const channel = supabase
-            .channel('workflow_logs_realtime')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'workflow_logs' }, (payload) => {
-                setLogs((prev) => [payload.new as Log, ...prev].slice(0, 50));
-            })
-            .subscribe();
+        const channelName = 'public-workflow_logs';
+        const channel = pusherClient.subscribe(channelName);
+        
+        channel.bind('workflow-log-inserted', (payload: any) => {
+            setLogs((prev) => [payload as Log, ...prev].slice(0, 50));
+        });
 
         return () => {
-            supabase.removeChannel(channel);
+            channel.unbind_all();
+            pusherClient.unsubscribe(channelName);
         };
-    }, [supabase]);
+    }, []);
 
     const getLevelIcon = (level: string) => {
         switch (level) {

@@ -2,18 +2,15 @@
 
 import { useEffect } from "react";
 import { mutate } from "swr";
-import { createClient } from "@/lib/supabase/client";
-
-// const supabase = createClient(); // Moved inside useEffect for SSR safety
+import { pusherClient } from "@/lib/pusher-client";
 
 /**
- * A reusable hook to subscribe to Supabase Realtime changes for a specific table.
- * When a change occurs (INSERT, UPDATE, DELETE), it triggers an SWR mutation
- * for the provided keys.
+ * A reusable hook to subscribe to Pusher Realtime changes for a specific table.
+ * When a change occurs, it triggers an SWR mutation for the provided keys.
  * 
  * @param table The table name to subscribe to
  * @param swrKeys One or more SWR keys to revalidate on change, or a filter function
- * @param filter Optional Postgres filter (e.g., "organization_id=eq.xyz")
+ * @param filter Optional filter (used as part of channel name if needed)
  */
 export function useRealtime(
     table: string,
@@ -21,10 +18,12 @@ export function useRealtime(
     filter?: string
 ) {
     useEffect(() => {
-        const supabase = createClient();
-        const channelName = `public:${table}-changes`;
+        // Sanitize filter to be URL safe for Pusher channel names
+        const safeFilter = filter ? filter.replace(/[^a-zA-Z0-9_-]/g, '_') : 'all';
+        const channelName = `private-${table}-${safeFilter}`;
+        
         console.log(`[Realtime] Initializing channel: ${channelName}`);
-        let channel = supabase.channel(channelName);
+        const channel = pusherClient.subscribe(channelName);
 
         const triggerMutate = (payload: any) => {
             console.log(`[Realtime] Change detected in ${table}:`, payload);
@@ -36,36 +35,20 @@ export function useRealtime(
             }
         };
 
-        if (filter) {
-            channel = channel.on(
-                "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: table,
-                    filter: filter
-                },
-                (payload) => triggerMutate(payload)
-            );
-        } else {
-            channel = channel.on(
-                "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: table,
-                },
-                (payload) => triggerMutate(payload)
-            );
-        }
+        channel.bind("change", (payload: any) => triggerMutate(payload));
 
-        channel.subscribe((status) => {
-            console.log(`[Realtime] Subscription status for ${table}:`, status);
+        channel.bind("pusher:subscription_succeeded", () => {
+            console.log(`[Realtime] Subscription status for ${table}: SUBSCRIBED`);
+        });
+
+        channel.bind("pusher:subscription_error", (error: any) => {
+            console.error(`[Realtime] Subscription error for ${table}:`, error);
         });
 
         return () => {
             console.log(`[Realtime] Cleaning up channel for ${table}`);
-            supabase.removeChannel(channel);
+            channel.unbind_all();
+            pusherClient.unsubscribe(channelName);
         };
     }, [table, swrKeys, filter]);
 }

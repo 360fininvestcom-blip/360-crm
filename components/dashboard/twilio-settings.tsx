@@ -7,11 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MessageSquare, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { getTwilioConfig } from "@/app/actions/settings";
 import { Switch } from "@/components/ui/switch";
 
 export function TwilioSettings({ orgId }: { orgId: string }) {
-    const supabase = createClient();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     
@@ -24,11 +23,7 @@ export function TwilioSettings({ orgId }: { orgId: string }) {
         const fetchConfig = async () => {
             setLoading(true);
             try {
-                const { data, error } = await supabase
-                    .from("twilio_configs")
-                    .select("*")
-                    .eq("organization_id", orgId)
-                    .single();
+                const data = await getTwilioConfig(orgId);
 
                 if (data) {
                     setAccountSid(data.account_sid);
@@ -44,7 +39,7 @@ export function TwilioSettings({ orgId }: { orgId: string }) {
         };
 
         if (orgId) fetchConfig();
-    }, [orgId, supabase]);
+    }, [orgId]);
 
     const handleSave = async () => {
         setSaving(true);

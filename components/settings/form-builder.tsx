@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { createClient } from "@/lib/supabase/client";
+import { getWebForms, createWebForm, updateWebForm, deleteWebForm } from "@/actions/web-forms";
 import { useActiveProfile } from "@/hooks/use-data";
 import { toast } from "sonner";
 
@@ -36,25 +36,23 @@ export function FormBuilder() {
     const [selectedEmbed, setSelectedEmbed] = useState<WebForm | null>(null);
     const [copied, setCopied] = useState(false);
 
-    const supabase = createClient();
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     const fetchForms = useCallback(async () => {
         if (!profile?.organization_id) return;
         setLoading(true);
-        const { data, error } = await supabase
-            .from('web_forms')
-            .select('*')
-            .eq('organization_id', profile.organization_id)
-            .order('created_at', { ascending: false });
-
-        if (!error && data) {
+        try {
+            const data = await getWebForms();
             setForms(data);
-        } else if (error && error.code === '42P01') {
-            console.log('web_forms table does not exist yet (pending migration)');
+        } catch (error: any) {
+            console.error("Error fetching forms:", error);
+            if (error.code === '42P01') {
+                console.log('web_forms table does not exist yet (pending migration)');
+            }
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
-    }, [profile?.organization_id, supabase]);
+    }, [profile?.organization_id]);
 
     useEffect(() => {
         fetchForms();
@@ -72,38 +70,31 @@ export function FormBuilder() {
             success_message: editingForm.success_message || 'Thank you!',
         };
 
-        let err;
-        if (editingForm.id) {
-            const { error } = await supabase
-                .from('web_forms')
-                .update(payload)
-                .eq('id', editingForm.id);
-            err = error;
-        } else {
-            const { error } = await supabase
-                .from('web_forms')
-                .insert([payload]);
-            err = error;
-        }
-
-        if (err) {
-            toast.error(err.code === '42P01' ? "Please deploy database migrations first." : "Failed to save form.");
-        } else {
+        try {
+            if (editingForm.id) {
+                await updateWebForm(editingForm.id, payload);
+            } else {
+                await createWebForm(editingForm.name, 'Website', payload);
+            }
+            
             toast.success("Form saved successfully.");
             setDialogOpen(false);
             fetchForms();
+        } catch (err: any) {
+            toast.error(err.code === '42P01' ? "Please deploy database migrations first." : "Failed to save form.");
+        } finally {
+            setSaving(false);
         }
-        setSaving(false);
     };
 
     const handleDelete = async (id: string) => {
         if (!confirm("Delete this form? All embedded versions will stop working.")) return;
-        const { error } = await supabase.from('web_forms').delete().eq('id', id);
-        if (error) {
-            toast.error("Failed to delete form.");
-        } else {
+        try {
+            await deleteWebForm(id);
             toast.success("Form deleted.");
             fetchForms();
+        } catch (error) {
+            toast.error("Failed to delete form.");
         }
     };
 

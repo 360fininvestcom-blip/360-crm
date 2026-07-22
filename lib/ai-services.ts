@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { decrypt } from "@/lib/crypto";
 
 export interface AIProviderKeys {
@@ -9,14 +10,13 @@ export interface AIProviderKeys {
 }
 
 export async function getActiveAIProvider(organizationId: string): Promise<AIProviderKeys | null> {
-    const supabase = await createClient();
-    const { data: apiKeys } = await supabase
-        .from("api_keys")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .single();
+    const apiKeys = await prisma.$queryRaw`
+        SELECT * FROM api_keys
+        WHERE organization_id = CAST(${organizationId} AS UUID)
+        LIMIT 1
+    `;
 
-    return apiKeys;
+    return (apiKeys as any[])[0] || null;
 }
 
 export async function generateEmbedding(text: string, keys: AIProviderKeys): Promise<number[] | null> {

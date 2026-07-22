@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { prisma } from '@/lib/prisma';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
+import { Prisma } from '@prisma/client';
 
 export async function POST(request: Request) {
     try {
@@ -11,76 +13,76 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Message body is required' }, { status: 400 });
         }
 
-        const cookieStore = await cookies();
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    get(name: string) { return cookieStore.get(name)?.value; },
-                },
-            }
-        );
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("organization_id")
-            .eq("user_id", user.id)
-            .single();
+        const profile = await prisma.profile.findUnique({
+            where: { userId: session.user.id },
+            select: { organizationId: true }
+        });
 
-        if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+        if (!profile || !profile.organizationId) {
+            return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+        }
 
-        const orgId = profile.organization_id;
+        const orgId = profile.organizationId;
 
-        // Check if Twilio config exists
-        const { data: twilioConfig } = await supabase
-            .from('twilio_configs')
-            .select('id')
-            .eq('organization_id', orgId)
-            .eq('is_active', true)
-            .single();
+        // Check if Twilio config exists using raw query since it's not in schema
+        const twilioConfigs: any[] = await prisma.$queryRaw`
+            SELECT id FROM twilio_configs 
+            WHERE organization_id = CAST(${orgId} AS UUID) AND is_active = true 
+            LIMIT 1;
+        `;
 
-        if (!twilioConfig) {
+        if (!twilioConfigs || twilioConfigs.length === 0) {
             return NextResponse.json({ error: 'Please configure Twilio settings in Integrations before sending bulk SMS.' }, { status: 400 });
         }
 
         // Resolve Contacts
-        let contacts: { id: string, phone: string, first_name: string, last_name: string, organization_id: string }[] = [];
+        let contacts: { id: string, phone: string | null, firstName: string, lastName: string | null, organizationId: string }[] = [];
 
         if (isSelectAllMatching) {
-            let query = supabase
-                .from('contacts')
-                .select('id, phone, first_name, last_name, organization_id')
-                .eq('organization_id', orgId);
-                
+            const where: Prisma.ContactWhereInput = {
+                organizationId: orgId
+            };
+            
             if (filters?.search) {
-                query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`);
+                where.OR = [
+                    { firstName: { contains: filters.search, mode: 'insensitive' } },
+                    { lastName: { contains: filters.search, mode: 'insensitive' } },
+                    { phone: { contains: filters.search, mode: 'insensitive' } }
+                ];
             }
             if (filters?.status && filters.status !== "all") {
-                query = query.eq('status', filters.status);
+                where.customFields = {
+                    path: ['status'],
+                    equals: filters.status
+                };
             }
             if (filters?.ownerId && filters.ownerId !== "all") {
-                query = query.eq('owner_id', filters.ownerId);
+                where.ownerId = filters.ownerId;
             }
 
-            const { data, error } = await query;
-            if (error) throw error;
-            contacts = data || [];
+            const data = await prisma.contact.findMany({
+                where,
+                select: { id: true, phone: true, firstName: true, lastName: true, organizationId: true }
+            });
+            contacts = data;
         } else {
             if (!contactIds || contactIds.length === 0) {
                 return NextResponse.json({ error: 'No contacts specified' }, { status: 400 });
             }
-            const { data, error } = await supabase
-                .from('contacts')
-                .select('id, phone, first_name, last_name, organization_id')
-                .in('id', contactIds)
-                .eq('organization_id', orgId);
-
-            if (error) throw error;
-            contacts = data || [];
+            const data = await prisma.contact.findMany({
+                where: {
+                    id: { in: contactIds },
+                    organizationId: orgId
+                },
+                select: { id: true, phone: true, firstName: true, lastName: true, organizationId: true }
+            });
+            contacts = data;
         }
 
         contacts = contacts.filter(c => !!c.phone);
@@ -93,8 +95,8 @@ export async function POST(request: Request) {
             let finalMessage = message;
             
             const variables: Record<string, string> = {
-                first_name: contact.first_name || 'there',
-                last_name: contact.last_name || ''
+                first_name: contact.firstName || 'there',
+                last_name: contact.lastName || ''
             };
 
             Object.entries(variables).forEach(([key, value]) => {
@@ -104,7 +106,7 @@ export async function POST(request: Request) {
 
             return {
                 organization_id: orgId,
-                to_phone: contact.phone,
+                to_phone: contact.phone!,
                 message: finalMessage,
                 contact_id: contact.id,
                 status: 'pending'
@@ -112,10 +114,11 @@ export async function POST(request: Request) {
         });
 
         if (queuePayloads.length > 0) {
-            const { error: insertError } = await supabase.from('sms_queue').insert(queuePayloads);
-            if (insertError) {
-                console.error("SMS Queue insert error:", insertError);
-                throw insertError;
+            for (const payload of queuePayloads) {
+                await prisma.$executeRaw`
+                    INSERT INTO sms_queue (organization_id, to_phone, message, contact_id, status)
+                    VALUES (CAST(${payload.organization_id} AS UUID), ${payload.to_phone}, ${payload.message}, CAST(${payload.contact_id} AS UUID), ${payload.status})
+                `;
             }
         }
 

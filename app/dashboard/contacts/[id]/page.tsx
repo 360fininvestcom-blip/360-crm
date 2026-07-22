@@ -30,8 +30,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { LeadScoreBadge } from "@/components/contacts/lead-score-badge";
 import { ContactStatusSelector } from "@/components/contacts/contact-status-selector";
 import { ContactDialog } from "@/components/contacts/contact-dialog";
-import { createClient } from "@/lib/supabase/client";
 import { useActiveProfile } from "@/hooks/use-data";
+import { getContactById, getActivitiesForContact, getDealsForContact, getTasksForContact, addNoteToContact } from "@/actions/contacts";
 import { toast } from "sonner";
 import { Contact, Deal, Task } from "@/types";
 import { Loader2, Sparkles } from "lucide-react";
@@ -54,7 +54,6 @@ export default function ContactDetailPage() {
     const router = useRouter();
     const contactId = params.id as string;
     const { data: profile } = useActiveProfile();
-    const supabase = createClient();
 
     const [contact, setContact] = useState<Contact | null>(null);
     const [activities, setActivities] = useState<Activity[]>([]);
@@ -96,74 +95,49 @@ export default function ContactDetailPage() {
         async function fetchContactData() {
             setLoading(true);
 
-            // 1. Fetch Contact
-            const { data: contactData } = await supabase
-                .from('contacts')
-                .select('*')
-                .eq('id', contactId)
-                .eq('organization_id', profile!.organization_id)
-                .single();
+            try {
+                // 1. Fetch Contact
+                const contactData = await getContactById(contactId);
+                if (contactData) setContact(contactData);
 
-            if (contactData) setContact(contactData);
+                // 2. Fetch Activities (Timeline)
+                const activityData = await getActivitiesForContact(contactId);
+                if (activityData) setActivities(activityData);
 
-            // 2. Fetch Activities (Timeline)
-            const { data: activityData } = await supabase
-                .from('activities')
-                .select('*, created_by_profile:profiles(full_name, avatar_url)')
-                .eq('contact_id', contactId)
-                .order('created_at', { ascending: false });
+                // 3. Fetch Deals
+                const dealsData = await getDealsForContact(contactId);
+                if (dealsData) setDeals(dealsData);
 
-            if (activityData) setActivities(activityData);
-
-            // 3. Fetch Deals
-            const { data: dealsData } = await supabase
-                .from('deals')
-                .select('*')
-                .eq('contact_id', contactId)
-                .order('created_at', { ascending: false });
-
-            if (dealsData) setDeals(dealsData);
-
-            // 4. Fetch Tasks
-            const { data: tasksData } = await supabase
-                .from('tasks')
-                .select('*, assigned_to_profile:profiles(full_name)')
-                .eq('contact_id', contactId)
-                .order('due_date', { ascending: true });
-
-            if (tasksData) setTasks(tasksData);
-
-            setLoading(false);
+                // 4. Fetch Tasks
+                const tasksData = await getTasksForContact(contactId);
+                if (tasksData) setTasks(tasksData);
+            } catch (error) {
+                console.error("Error fetching contact data:", error);
+                toast.error("Failed to load contact data");
+            } finally {
+                setLoading(false);
+            }
         }
 
         fetchContactData();
-    }, [contactId, profile, supabase]);
+    }, [contactId, profile]);
 
     const handleAddNote = async () => {
         if (!noteContent.trim() || !profile?.organization_id) return;
         setIsSavingNote(true);
 
-        const { data, error } = await supabase
-            .from('activities')
-            .insert({
-                organization_id: profile.organization_id,
-                contact_id: contactId,
-                type: 'note',
-                title: 'Note added',
-                description: noteContent,
-                created_by: profile.id
-            })
-            .select('*, created_by_profile:profiles(full_name, avatar_url)')
-            .single();
-
-        if (error) {
-            toast.error("Failed to save note");
-        } else if (data) {
+        try {
+            const data = await addNoteToContact(contactId, noteContent);
+            
             toast.success("Note added");
             setActivities([data, ...activities]);
             setNoteContent("");
+        } catch (error) {
+            console.error("Error adding note:", error);
+            toast.error("Failed to save note");
+        } finally {
+            setIsSavingNote(false);
         }
-        setIsSavingNote(false);
     };
 
     if (loading) {

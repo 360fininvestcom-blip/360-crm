@@ -1,38 +1,29 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { decrypt } from '@/lib/crypto';
 
 export async function POST(request: Request) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
-        }
-    );
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     try {
         const { organization_id } = await request.json();
 
-        // Fetch active accounts for this org and user (or org-wide)
-        const { data: accounts, error: accountsError } = await supabase
-            .from('smtp_configs')
-            .select('*')
-            .eq('organization_id', organization_id)
-            .eq('is_active', true);
+        // Fetch active accounts for this org
+        const accounts: any[] = await prisma.$queryRaw`
+            SELECT * FROM smtp_configs
+            WHERE organization_id = CAST(${organization_id} AS UUID)
+              AND is_active = true
+        `;
 
-        if (accountsError || !accounts) return NextResponse.json({ error: 'No active accounts found' }, { status: 404 });
+        if (!accounts || accounts.length === 0) return NextResponse.json({ error: 'No active accounts found' }, { status: 404 });
 
         const results = [];
 
@@ -56,12 +47,11 @@ export async function POST(request: Request) {
                 await client.connect();
 
                 // Define folders to sync
-                // specific mapping can be improved later by listing folders
                 const foldersToSync = [
                     { remote: 'INBOX', local: 'inbox' },
-                    { remote: 'Sent', local: 'sent' }, // Standard
-                    { remote: 'Sent Items', local: 'sent' }, // Outlook
-                    { remote: '[Gmail]/Sent Mail', local: 'sent' } // Gmail
+                    { remote: 'Sent', local: 'sent' },
+                    { remote: 'Sent Items', local: 'sent' },
+                    { remote: '[Gmail]/Sent Mail', local: 'sent' }
                 ];
 
                 // Get list of actual folders to verify existence
@@ -70,20 +60,17 @@ export async function POST(request: Request) {
                 for (const folderMapping of foldersToSync) {
                     // Check if folder exists
                     const folderExists = actualFolders.some(f => f.path === folderMapping.remote);
-                    if (!folderExists && folderMapping.remote !== 'INBOX') continue; // Always try INBOX
+                    if (!folderExists && folderMapping.remote !== 'INBOX') continue;
 
                     try {
                         const lock = await client.getMailboxLock(folderMapping.remote);
                         try {
-                            // Determine search criteria (fetch since last sync or last 50)
                             const searchCriteria = account.last_sync_at
                                 ? { since: new Date(account.last_sync_at) }
-                                : { seq: '1:*' }; // Fetch all if not sync (limited by slice below)
+                                : { seq: '1:*' };
 
-                            // Adjust search for efficiency - fetching UIDs
                             let uids = await client.search(searchCriteria) || [];
 
-                            // If no last sync, just get the last 50
                             if (!account.last_sync_at) {
                                 uids = uids.slice(-50);
                             }
@@ -92,25 +79,26 @@ export async function POST(request: Request) {
                                 const message = await client.fetchOne(uid.toString(), { source: true });
                                 if (!message || !message.source) continue;
 
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 const parsed: any = await simpleParser(message.source);
 
-                                // Upsert into Supabase
-                                await supabase.from('emails').upsert({
-                                    account_id: account.id,
-                                    organization_id: account.organization_id,
-                                    message_id: parsed.messageId || `${account.id}-${uid}`,
-                                    uid: uid,
-                                    from_name: parsed.from?.value[0]?.name || '',
-                                    from_addr: parsed.from?.value[0]?.address || '',
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    to_addr: parsed.to ? (Array.isArray(parsed.to) ? (parsed.to[0] as any).value[0].address : (parsed.to as any).value[0].address) : '',
-                                    subject: parsed.subject,
-                                    body_html: parsed.html || '',
-                                    body_text: parsed.text || '',
-                                    folder: folderMapping.local,
-                                    received_at: parsed.date?.toISOString() || new Date().toISOString()
-                                }, { onConflict: 'account_id, message_id' });
+                                // Upsert into Prisma using raw query as emails table is not in prisma schema
+                                const messageId = parsed.messageId || `${account.id}-${uid}`;
+                                const fromName = parsed.from?.value[0]?.name || '';
+                                const fromAddr = parsed.from?.value[0]?.address || '';
+                                const toAddr = parsed.to ? (Array.isArray(parsed.to) ? (parsed.to[0] as any).value[0].address : (parsed.to as any).value[0].address) : '';
+                                const subject = parsed.subject || '';
+                                const bodyHtml = parsed.html || '';
+                                const bodyText = parsed.text || '';
+                                const folder = folderMapping.local;
+                                const receivedAt = parsed.date ? parsed.date.toISOString() : new Date().toISOString();
+
+                                await prisma.$executeRaw`
+                                    INSERT INTO emails (account_id, organization_id, message_id, uid, from_name, from_addr, to_addr, subject, body_html, body_text, folder, received_at)
+                                    VALUES (CAST(${account.id} AS UUID), CAST(${account.organization_id} AS UUID), ${messageId}, ${uid}, ${fromName}, ${fromAddr}, ${toAddr}, ${subject}, ${bodyHtml}, ${bodyText}, ${folder}, CAST(${receivedAt} AS TIMESTAMPTZ))
+                                    ON CONFLICT (account_id, message_id) DO UPDATE
+                                    SET folder = EXCLUDED.folder,
+                                        received_at = EXCLUDED.received_at
+                                `;
                             }
                         } finally {
                             lock.release();
@@ -121,9 +109,12 @@ export async function POST(request: Request) {
                 }
 
                 // Update last_sync_at
-                await supabase.from('smtp_configs')
-                    .update({ last_sync_at: new Date().toISOString() })
-                    .eq('id', account.id);
+                const now = new Date().toISOString();
+                await prisma.$executeRaw`
+                    UPDATE smtp_configs
+                    SET last_sync_at = CAST(${now} AS TIMESTAMPTZ)
+                    WHERE id = CAST(${account.id} AS UUID)
+                `;
 
                 results.push({ account: account.name, status: 'synced' });
 

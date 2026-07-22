@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { useActiveProfile } from '@/hooks/use-data';
+import { pusherClient } from '@/lib/pusher-client';
 import { toast } from 'sonner';
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from '@/actions/notifications';
 
 export interface AppNotification {
     id: string;
@@ -23,7 +24,6 @@ export function useNotifications() {
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
-    const supabase = createClient();
 
     useEffect(() => {
         if (!profile?.id) return;
@@ -31,81 +31,59 @@ export function useNotifications() {
         // 1. Fetch initial notifications
         const fetchNotifications = async () => {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('notifications')
-                .select('*')
-                .eq('user_id', profile.id)
-                .order('created_at', { ascending: false })
-                .limit(50);
-
-            if (!error && data) {
+            try {
+                const data = await getNotifications();
                 setNotifications(data);
-                setUnreadCount(data.filter(n => !n.is_read).length);
+                setUnreadCount(data.filter((n: AppNotification) => !n.is_read).length);
+            } catch (error) {
+                console.error("Error fetching notifications", error);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         fetchNotifications();
 
-        // 2. Subscribe to Realtime changes
-        const channel = supabase
-            .channel(`notifications:user_id=eq.${profile.id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${profile.id}`,
-                },
-                (payload) => {
-                    const newNotification = payload.new as AppNotification;
-                    setNotifications((prev) => [newNotification, ...prev]);
-                    setUnreadCount((prev) => prev + 1);
-                    toast(newNotification.title, {
-                        description: newNotification.message,
-                        action: newNotification.link_url ? {
-                            label: 'View',
-                            onClick: () => window.location.href = newNotification.link_url!
-                        } : undefined
-                    });
+        // 2. Subscribe to Realtime changes via Pusher
+        const channelName = `private-user-${profile.id}`;
+        const channel = pusherClient.subscribe(channelName);
+        
+        channel.bind('notification-inserted', (payload: any) => {
+            const newNotification = payload as AppNotification;
+            setNotifications((prev) => [newNotification, ...prev]);
+            setUnreadCount((prev) => prev + 1);
+            toast(newNotification.title, {
+                description: newNotification.message,
+                action: newNotification.link_url ? {
+                    label: 'View',
+                    onClick: () => window.location.href = newNotification.link_url!
+                } : undefined
+            });
+        });
+
+        channel.bind('notification-updated', (payload: any) => {
+            const updated = payload as AppNotification;
+            setNotifications((prev) => {
+                const oldNotification = prev.find(n => n.id === updated.id);
+                if (oldNotification?.is_read === false && updated.is_read === true) {
+                    setUnreadCount((count) => Math.max(0, count - 1));
                 }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${profile.id}`,
-                },
-                (payload) => {
-                    const updated = payload.new as AppNotification;
-                    setNotifications((prev) =>
-                        prev.map((n) => (n.id === updated.id ? updated : n))
-                    );
-                    if (payload.old.is_read === false && updated.is_read === true) {
-                        setUnreadCount((prev) => Math.max(0, prev - 1));
-                    }
-                }
-            )
-            .subscribe();
+                return prev.map((n) => (n.id === updated.id ? updated : n));
+            });
+        });
 
         return () => {
-            supabase.removeChannel(channel);
+            channel.unbind_all();
+            pusherClient.unsubscribe(channelName);
         };
-    }, [profile?.id, supabase]);
+    }, [profile?.id]);
 
     const markAsRead = async (id: string) => {
         setNotifications((prev) =>
             prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
         );
         setUnreadCount((prev) => Math.max(0, prev - 1));
-
-        await supabase
-            .from('notifications')
-            .update({ is_read: true })
-            .eq('id', id);
+        await markNotificationAsRead(id);
     };
 
     const markAllAsRead = async () => {
@@ -115,23 +93,14 @@ export function useNotifications() {
             prev.map((n) => ({ ...n, is_read: true }))
         );
         setUnreadCount(0);
-
-        await supabase
-            .from('notifications')
-            .update({ is_read: true })
-            .eq('user_id', profile.id)
-            .eq('is_read', false);
+        await markAllNotificationsAsRead();
     };
 
     const clearAll = async () => {
         if (!profile?.id) return;
         setNotifications([]);
         setUnreadCount(0);
-
-        await supabase
-            .from('notifications')
-            .delete()
-            .eq('user_id', profile.id);
+        await clearAllNotifications();
     };
 
     return {

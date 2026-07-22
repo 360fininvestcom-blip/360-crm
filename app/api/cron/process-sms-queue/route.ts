@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
 import twilio from 'twilio';
 import { decrypt } from '@/lib/crypto';
-
-const getSupabaseAdmin = () => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-);
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: Request) {
     const authHeader = request.headers.get('authorization');
@@ -15,20 +10,13 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = getSupabaseAdmin();
-
     // Fetch up to 10 pending SMS (safe for 1 Message-Per-Second limit over 10s)
-    const { data: queueItems, error: fetchError } = await supabase
-        .from('sms_queue')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true })
-        .limit(10);
-
-    if (fetchError) {
-        console.error('Error fetching sms queue:', fetchError);
-        return NextResponse.json({ error: 'Failed to fetch queue' }, { status: 500 });
-    }
+    const queueItems: any[] = await prisma.$queryRaw`
+        SELECT * FROM sms_queue
+        WHERE status = 'pending'
+        ORDER BY created_at ASC
+        LIMIT 10
+    `;
 
     if (!queueItems || queueItems.length === 0) {
         return NextResponse.json({ message: 'No SMS to process' });
@@ -36,15 +24,19 @@ export async function GET(request: Request) {
 
     // Mark as processing
     const itemIds = queueItems.map(item => item.id);
-    await supabase.from('sms_queue').update({ status: 'processing' }).in('id', itemIds);
+    await prisma.$executeRaw`
+        UPDATE sms_queue 
+        SET status = 'processing' 
+        WHERE id IN (${Prisma.join(itemIds.map(id => Prisma.sql`CAST(${id} AS UUID)`))})
+    `;
 
     // Group by organization to fetch Twilio configs efficiently
     const orgIds = [...new Set(queueItems.map(i => i.organization_id))];
-    const { data: configs } = await supabase
-        .from('twilio_configs')
-        .select('*')
-        .in('organization_id', orgIds)
-        .eq('is_active', true);
+    const configs: any[] = await prisma.$queryRaw`
+        SELECT * FROM twilio_configs
+        WHERE is_active = true
+        AND organization_id IN (${Prisma.join(orgIds.map(id => Prisma.sql`CAST(${id} AS UUID)`))})
+    `;
 
     const configMap = new Map();
     configs?.forEach(cfg => {
@@ -70,18 +62,18 @@ export async function GET(request: Request) {
 
             // Check if contact unsubscribed (e.g., they replied STOP)
             if (item.contact_id) {
-                 const { data: contact } = await supabase
-                     .from('contacts')
-                     .select('unsubscribed')
-                     .eq('id', item.contact_id)
-                     .single();
+                 const rawContacts: any[] = await prisma.$queryRaw`SELECT unsubscribed FROM contacts WHERE id = CAST(${item.contact_id} AS UUID)`;
+                 const rawContact = rawContacts[0];
 
-                 if (contact?.unsubscribed) {
-                     await supabase.from('sms_queue').update({
-                         status: 'failed',
-                         error_message: 'Contact is unsubscribed',
-                         processed_at: new Date().toISOString()
-                     }).eq('id', item.id);
+                 if (rawContact?.unsubscribed) {
+                     const now = new Date().toISOString();
+                     await prisma.$executeRaw`
+                        UPDATE sms_queue
+                        SET status = 'failed',
+                            error_message = 'Contact is unsubscribed',
+                            processed_at = CAST(${now} AS TIMESTAMPTZ)
+                        WHERE id = CAST(${item.id} AS UUID)
+                     `;
                      continue;
                  }
             }
@@ -94,10 +86,13 @@ export async function GET(request: Request) {
             });
 
             // Mark completed
-            await supabase.from('sms_queue').update({
-                status: 'completed',
-                processed_at: new Date().toISOString()
-            }).eq('id', item.id);
+            const now = new Date().toISOString();
+            await prisma.$executeRaw`
+                UPDATE sms_queue
+                SET status = 'completed',
+                    processed_at = CAST(${now} AS TIMESTAMPTZ)
+                WHERE id = CAST(${item.id} AS UUID)
+            `;
 
             processedCount++;
 
@@ -105,12 +100,16 @@ export async function GET(request: Request) {
             await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (err: any) {
             console.error(`Failed to send queued SMS ${item.id}:`, err);
-            await supabase.from('sms_queue').update({
-                status: 'failed',
-                error_message: err.message || 'Unknown error',
-                attempts: item.attempts + 1,
-                processed_at: new Date().toISOString()
-            }).eq('id', item.id);
+            const now = new Date().toISOString();
+            const attempts = (item.attempts || 0) + 1;
+            await prisma.$executeRaw`
+                UPDATE sms_queue
+                SET status = 'failed',
+                    error_message = ${err.message || 'Unknown error'},
+                    attempts = ${attempts},
+                    processed_at = CAST(${now} AS TIMESTAMPTZ)
+                WHERE id = CAST(${item.id} AS UUID)
+            `;
         }
     }
 
