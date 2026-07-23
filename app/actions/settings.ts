@@ -101,15 +101,26 @@ export async function updateApiKeys(orgId: string, updates: Partial<APIKeys>) {
 }
 
 export async function getSipAccounts(userId: string) {
-    const session = await getSession();
-    if (!session?.user) throw new Error("Unauthorized");
-    return await prisma.sipProfile.findMany({
-        where: { userId },
-        orderBy: [
-            { isDefault: "desc" },
-            { createdAt: "asc" }
-        ]
-    });
+    try {
+        const session = await getSession();
+        if (!session?.user) throw new Error("Unauthorized");
+
+        const profile = await prisma.profile.findFirst({
+            where: { userId }
+        });
+        if (!profile) return [];
+
+        return await prisma.sipProfile.findMany({
+            where: { userId: profile.id },
+            orderBy: [
+                { isDefault: "desc" },
+                { createdAt: "asc" }
+            ]
+        });
+    } catch (error) {
+        console.error("[getSipAccounts] Error fetching SIP profiles:", error);
+        return [];
+    }
 }
 
 export async function saveSipAccount(id: string | undefined, userId: string, orgId: string, data: Partial<SIPProfile>) {
@@ -160,15 +171,26 @@ export async function setDefaultSipAccount(id: string, userId: string) {
 }
 
 export async function getTwilioConfig(orgId: string) {
-    const session = await getSession();
-    if (!session?.user) throw new Error("Unauthorized");
-    
-    const config = await prisma.$queryRaw`
-        SELECT * FROM twilio_configs
-        WHERE organization_id = CAST(${orgId} AS UUID)
-        LIMIT 1
-    `;
-    
-    // @ts-ignore
-    return config[0] || null;
+    try {
+        const session = await getSession();
+        if (!session?.user) throw new Error("Unauthorized");
+
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!orgId || !uuidRegex.test(orgId)) {
+            console.warn(`[getTwilioConfig] Invalid organization ID: ${orgId}`);
+            return null;
+        }
+        
+        const config = await prisma.$queryRaw`
+            SELECT * FROM twilio_configs
+            WHERE organization_id = CAST(${orgId} AS UUID)
+            LIMIT 1
+        `;
+        
+        // @ts-ignore
+        return config[0] || null;
+    } catch (error) {
+        console.error("[getTwilioConfig] Error fetching Twilio configuration:", error);
+        return null;
+    }
 }
