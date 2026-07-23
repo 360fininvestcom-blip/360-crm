@@ -325,12 +325,14 @@ export function CallWidget() {
             <AnimatePresence>
                 <motion.div
                     layoutId="dialer-container"
+                    layout
+                    transition={{ type: "spring", stiffness: 280, damping: 28 }}
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
                     className={cn(
-                        "fixed bottom-6 right-6 z-50 bg-background/80 backdrop-blur-xl border border-white/10 shadow-2xl rounded-3xl overflow-hidden transition-all duration-500",
-                        isMinimized ? "w-16 h-16 rounded-full" : "w-[380px] h-[600px] max-h-[90vh]"
+                        "fixed bottom-6 right-6 z-50 bg-background/80 backdrop-blur-xl border border-white/10 shadow-2xl rounded-3xl overflow-hidden",
+                        isMinimized ? "w-16 h-16 rounded-full" : isInCall ? "w-[380px] h-[510px]" : "w-[380px] h-[600px] max-h-[90vh]"
                     )}
                 >
                     {isMinimized ? (

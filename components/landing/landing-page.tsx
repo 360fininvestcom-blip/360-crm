@@ -228,6 +228,8 @@ export default function LandingPageContent({
             className="mt-16 max-w-5xl mx-auto"
           >
             <div className="relative rounded-xl bg-gradient-to-br from-primary/30 via-primary/10 to-transparent p-[2px]">
+              <div className="absolute -inset-10 bg-primary/15 blur-[80px] rounded-full -z-10 pointer-events-none opacity-60 dark:opacity-85" />
+              <div className="absolute -inset-20 bg-indigo-500/5 blur-[120px] rounded-full -z-10 pointer-events-none opacity-40" />
               <div className="rounded-lg bg-card border border-border/50 shadow-2xl overflow-hidden glass-panel">
                 <Image
                   src="/elite-dashboard-v4.png"
@@ -290,8 +292,13 @@ export default function LandingPageContent({
                           <span>Revenue: ${current.toLocaleString()}</span>
                           <span className="text-muted-foreground">Target: ${target.toLocaleString()}</span>
                         </div>
-                        <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
-                          <div className="bg-primary h-full transition-all duration-500" style={{ width: `${percent}%` }} />
+                        <div className="w-full bg-muted/65 h-3.5 rounded-full overflow-hidden relative border border-border/10">
+                          <div
+                            className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-full transition-all duration-550 relative"
+                            style={{ width: `${percent}%` }}
+                          >
+                            <div className="absolute inset-0 shimmer-progress" />
+                          </div>
                         </div>
                         <div className="text-xs font-semibold text-muted-foreground text-right">
                           <span>{percent}% of Target Met</span>
