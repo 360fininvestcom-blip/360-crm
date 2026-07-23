@@ -11,7 +11,7 @@ interface CallHistoryProps {
     contactId?: string;
 }
 
-export const CallHistory = ({ onDial, contactId }: CallHistoryProps) => {
+export const CallHistory = React.memo(({ onDial, contactId }: CallHistoryProps) => {
     const { data: calls = [], isLoading } = useCallLogs(20, contactId);
 
     if (isLoading) {
@@ -75,4 +75,6 @@ export const CallHistory = ({ onDial, contactId }: CallHistoryProps) => {
             </div>
         </div>
     );
-};
+});
+
+CallHistory.displayName = "CallHistory";

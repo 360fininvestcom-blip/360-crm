@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Phone,
@@ -275,11 +275,26 @@ export function CallWidget() {
         return () => window.removeEventListener("sip:call:failed", handleFailure);
     }, [handleHangup]);
 
-    const handleQuickDial = (phone: string) => {
+    const handleKeyPress = useCallback((k: string) => {
+        const { currentNumber } = useDialerStore.getState();
+        setCurrentNumber(currentNumber + k);
+    }, [setCurrentNumber]);
+
+    const formattedSearchResults = useMemo(() => {
+        return (searchResults?.data || []).map(c => ({
+            id: c.id,
+            firstName: c.firstName,
+            lastName: c.lastName ?? "",
+            phone: c.phone ?? "",
+            company: c.company ?? ""
+        }));
+    }, [searchResults]);
+
+    const handleQuickDial = useCallback((phone: string) => {
         setCurrentNumber(phone);
         setSearchQuery("");
         handleCall(phone);
-    };
+    }, [setCurrentNumber, handleCall]);
 
     if (!isOpen) {
         return (
@@ -489,16 +504,10 @@ export function CallWidget() {
                                             <DialerPad
                                                 currentNumber={currentNumber}
                                                 onNumberChange={setCurrentNumber}
-                                                onKeyPress={(k) => setCurrentNumber(currentNumber + k)}
+                                                onKeyPress={handleKeyPress}
                                                 searchQuery={searchQuery}
                                                 onSearchChange={setSearchQuery}
-                                                searchResults={(searchResults?.data || []).map(c => ({
-                                                    id: c.id,
-                                                    firstName: c.firstName,
-                                                    lastName: c.lastName ?? "",
-                                                    phone: c.phone ?? "",
-                                                    company: c.company ?? ""
-                                                }))}
+                                                searchResults={formattedSearchResults}
                                                 onQuickDial={handleQuickDial}
                                             />
                                             <div className="mt-6 flex justify-center">

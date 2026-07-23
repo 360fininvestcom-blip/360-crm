@@ -48,6 +48,7 @@ export const ActiveCall = ({
     onTransfer
 }: ActiveCallProps) => {
     const [stream, setStream] = React.useState<MediaStream | null>(null);
+    const visualizerRef = React.useRef<HTMLDivElement>(null);
     React.useEffect(() => {
         const getStream = async () => {
             const { SipService } = await import("@/lib/services/sip-service");
@@ -55,7 +56,7 @@ export const ActiveCall = ({
         };
         getStream();
     }, []);
-    const volumes = useWaveform(stream, status === "active", 20);
+    useWaveform(visualizerRef, stream, status === "active", 20);
     const [voicemailFile, setVoicemailFile] = useState<File | null>(null);
     const [isDropping, setIsDropping] = useState(false);
     const [quality, setQuality] = useState<"good" | "fair" | "poor" | "unknown">("unknown");
@@ -100,17 +101,16 @@ export const ActiveCall = ({
     return (
         <div className="space-y-6 flex flex-col items-center py-4">
             {/* Visualizer */}
-            <div className="w-full h-24 flex items-center justify-center gap-1.5 px-10">
-                {volumes.map((vol, i) => (
-                    <motion.div
+            <div ref={visualizerRef} className="w-full h-24 flex items-center justify-center gap-1.5 px-10">
+                {Array.from({ length: 20 }).map((_, i) => (
+                    <div
                         key={i}
+                        data-bar={i}
                         className={cn(
-                            "w-1.5 bg-primary/40 rounded-full",
-                            status === "active" ? "bg-primary" : "bg-muted-foreground/30 h-1"
+                            "w-1.5 bg-primary/40 rounded-full transition-all duration-75",
+                            status === "active" ? "bg-primary" : "bg-muted-foreground/30"
                         )}
-                        initial={{ height: "4px" }}
-                        animate={{ height: status === "active" ? `${vol}%` : "4px" }}
-                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                        style={{ height: "4px" }}
                     />
                 ))}
             </div>

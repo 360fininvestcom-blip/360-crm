@@ -1,23 +1,41 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
-export function useWaveform(stream: MediaStream | null, isActive: boolean, barCount: number = 20) {
-    const [volumes, setVolumes] = useState<number[]>(new Array(barCount).fill(0));
+export function useWaveform(
+    containerRef: React.RefObject<HTMLDivElement | null>,
+    stream: MediaStream | null,
+    isActive: boolean,
+    barCount: number = 20
+) {
     const analyzerRef = useRef<AnalyserNode | null>(null);
     const contextRef = useRef<AudioContext | null>(null);
     const animationRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!isActive) {
-            setVolumes(new Array(barCount).fill(0));
+        if (!isActive || !containerRef.current) {
+            // Reset heights to 4px
+            if (containerRef.current) {
+                const bars = containerRef.current.querySelectorAll("[data-bar]");
+                bars.forEach(bar => {
+                    (bar as HTMLElement).style.height = "4px";
+                });
+            }
             return;
         }
+
+        const bars = containerRef.current.querySelectorAll("[data-bar]");
 
         if (!stream) {
             // Simulated mode for demo/active call without stream
             const simulate = () => {
-                setVolumes(prev => prev.map(() => Math.random() * 60 + 20));
+                for (let i = 0; i < barCount; i++) {
+                    const bar = bars[i] as HTMLElement;
+                    if (bar) {
+                        const heightPercent = Math.random() * 60 + 20;
+                        bar.style.height = `${heightPercent}%`;
+                    }
+                }
                 animationRef.current = requestAnimationFrame(simulate);
             };
             animationRef.current = requestAnimationFrame(simulate);
@@ -43,15 +61,15 @@ export function useWaveform(stream: MediaStream | null, isActive: boolean, barCo
                 if (!analyzerRef.current) return;
                 analyzerRef.current.getByteFrequencyData(dataArray);
 
-                // Sample frequency data to fill barCount
-                const newVolumes = [];
                 const step = Math.floor(bufferLength / barCount);
                 for (let i = 0; i < barCount; i++) {
-                    const value = dataArray[i * step] || 0;
-                    // Scale 0-255 to 10-100%
-                    newVolumes.push((value / 255) * 80 + 10);
+                    const bar = bars[i] as HTMLElement;
+                    if (bar) {
+                        const value = dataArray[i * step] || 0;
+                        const heightPercent = (value / 255) * 80 + 10;
+                        bar.style.height = `${heightPercent}%`;
+                    }
                 }
-                setVolumes(newVolumes);
                 animationRef.current = requestAnimationFrame(update);
             };
 
@@ -64,7 +82,5 @@ export function useWaveform(stream: MediaStream | null, isActive: boolean, barCo
             if (animationRef.current) cancelAnimationFrame(animationRef.current);
             if (contextRef.current) contextRef.current.close().catch(() => { });
         };
-    }, [stream, isActive, barCount]);
-
-    return volumes;
+    }, [stream, isActive, barCount, containerRef]);
 }
