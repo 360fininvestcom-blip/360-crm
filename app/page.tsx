@@ -4,16 +4,27 @@ import { PageClientWrapper } from "./page-client-wrapper";
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
-  const announcements = await prisma.announcement.findMany({
-    where: { published: true },
-    orderBy: { createdAt: "desc" },
-    take: 3
-  });
+  let announcements: any[] = [];
+  let campaigns: any[] = [];
 
-  const campaigns = await prisma.salesCampaign.findMany({
-    where: { isActive: true },
-    orderBy: { createdAt: "desc" }
-  });
+  try {
+    announcements = await prisma.announcement.findMany({
+      where: { published: true },
+      orderBy: { createdAt: "desc" },
+      take: 3
+    });
+  } catch (err) {
+    console.error("Failed to fetch announcements from DB:", err);
+  }
+
+  try {
+    campaigns = await prisma.salesCampaign.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: "desc" }
+    });
+  } catch (err) {
+    console.error("Failed to fetch campaigns from DB:", err);
+  }
 
   const serializedAnnouncements = announcements.map(a => ({
     id: a.id,
