@@ -487,7 +487,7 @@ export function CallWidget() {
                                                     <SelectValue placeholder="Select SIP Account" />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-background/95 backdrop-blur-xl border-white/10 rounded-xl">
-                                                    {sipAccounts?.map((acc) => (
+                                                    {Array.isArray(sipAccounts) && sipAccounts.map((acc) => (
                                                         <SelectItem key={acc.id} value={acc.id} className="rounded-lg focus:bg-primary/10">
                                                             <div className="flex items-center gap-2">
                                                                 <div className={cn(
@@ -498,7 +498,7 @@ export function CallWidget() {
                                                             </div>
                                                         </SelectItem>
                                                     ))}
-                                                    {(!sipAccounts || sipAccounts.length === 0) && (
+                                                    {(!Array.isArray(sipAccounts) || sipAccounts.length === 0) && (
                                                         <SelectItem value="demo" className="rounded-lg focus:bg-primary/10">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="h-1.5 w-1.5 rounded-full bg-green-500" />

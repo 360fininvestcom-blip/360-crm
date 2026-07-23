@@ -50,7 +50,7 @@ export function UpcomingTasks() {
                 <Button variant="ghost" size="sm">Add task</Button>
             </CardHeader>
             <CardContent className="space-y-3">
-                {myTasks?.slice(0, 5).map((task: Task) => (
+                {Array.isArray(myTasks) && myTasks.slice(0, 5).map((task: Task) => (
                     <motion.div
                         key={task.id}
                         variants={item}
@@ -77,7 +77,7 @@ export function UpcomingTasks() {
                         </Badge>
                     </motion.div>
                 ))}
-                {(!myTasks || myTasks.length === 0) && (
+                {(!Array.isArray(myTasks) || myTasks.length === 0) && (
                     <p className="text-center text-muted-foreground py-8">No upcoming tasks.</p>
                 )}
             </CardContent>
