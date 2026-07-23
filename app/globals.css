@@ -81,6 +81,47 @@
   --sidebar-ring: oklch(0.55 0.25 260);
 }
 
+@layer utilities {
+  .glass-panel {
+    @apply backdrop-blur-md bg-white/5 border border-white/10 shadow-xl;
+  }
+  
+  .glow-border {
+    @apply relative before:absolute before:-inset-[1px] before:rounded-xl before:border before:border-transparent before:bg-gradient-to-r before:from-blue-500/50 before:to-purple-500/50 before:-z-10;
+  }
+  
+  .glow-accent {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+  }
+  
+  .shimmer-progress {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .shimmer-progress::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%
+    );
+    animation: shimmer 2s infinite linear;
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
 .dark {
   --background: oklch(0.18 0.03 260);
   --foreground: oklch(0.98 0.01 260);
