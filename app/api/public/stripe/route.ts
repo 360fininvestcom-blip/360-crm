@@ -70,12 +70,25 @@ export async function POST(request: Request) {
         }
 
         // 3. Find default Pipeline
-        const pipeline = await prisma.pipeline.findFirst({
+        let pipeline = await prisma.pipeline.findFirst({
             where: { organizationId: org.id }
         });
 
         if (!pipeline) {
-            return NextResponse.json({ error: "No pipeline configured for deals" }, { status: 400 });
+            const defaultStages = [
+                { id: "lead", name: "Lead", order: 1, color: "#3b82f6" },
+                { id: "contacted", name: "Contacted", order: 2, color: "#eab308" },
+                { id: "proposal", name: "Proposal Sent", order: 3, color: "#a855f7" },
+                { id: "negotiation", name: "In Negotiation", order: 4, color: "#f97316" },
+                { id: "won", name: "Closed Won", order: 5, color: "#22c55e" }
+            ];
+            pipeline = await prisma.pipeline.create({
+                data: {
+                    organizationId: org.id,
+                    name: "Sales Pipeline",
+                    stages: JSON.stringify(defaultStages)
+                }
+            });
         }
 
         // Resolve won/closed stage name

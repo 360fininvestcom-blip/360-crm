@@ -153,15 +153,15 @@ export async function POST(request: Request) {
 
         if (admins.length > 0) {
             const notifs = admins.map(a => ({
-                organizationId,
                 userId: a.userId,
                 title: "New Web Lead",
                 message: `${contact.firstName} ${contact.lastName || ""} from ${formName}`,
                 type: "lead",
-                link: `/dashboard/contacts/${contact.id}`
+                linkUrl: `/dashboard/contacts/${contact.id}`
             }));
+
             await prisma.notification.createMany({
-                data: notifs as any
+                data: notifs
             });
         }
 
