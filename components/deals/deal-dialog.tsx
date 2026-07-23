@@ -285,7 +285,7 @@ export function DealDialog({
                                                     No contact
                                                 </CommandItem>
                                             )}
-                                            {contacts?.map((contact) => {
+                                            {Array.isArray(contacts) && contacts.map((contact) => {
                                                 const label = `${contact.firstName} ${contact.lastName || ""}${contact.company ? ` - ${contact.company}` : ""}`;
                                                 return (
                                                     <CommandItem

@@ -283,7 +283,7 @@ export function ContactDialog({
                                      <SelectContent>
                                          <ScrollArea className="h-[200px]">
                                              <div className="p-1">
-                                                 {statuses?.map((s) => (
+                                                 {Array.isArray(statuses) && statuses.map((s) => (
                                                      <SelectItem key={s.id} value={s.name.toLowerCase()}>
                                                          {s.label}
                                                      </SelectItem>

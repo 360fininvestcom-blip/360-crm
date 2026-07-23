@@ -152,7 +152,7 @@ export function EmailComposerDialog({
                                     <SelectValue placeholder="Select account..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {accounts?.map(acc => (
+                                    {Array.isArray(accounts) && accounts.map(acc => (
                                         <SelectItem key={acc.id} value={acc.id}>
                                             {acc.fromName || "Unknown"} &lt;{acc.fromEmail}&gt;
                                         </SelectItem>
@@ -172,7 +172,7 @@ export function EmailComposerDialog({
                                     <SelectValue placeholder="Load template..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {templates?.map((t) => (
+                                    {Array.isArray(templates) && templates.map((t) => (
                                         <SelectItem key={t.id} value={t.id}>
                                             {t.name}
                                         </SelectItem>
