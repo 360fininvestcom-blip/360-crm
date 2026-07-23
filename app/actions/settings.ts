@@ -105,8 +105,20 @@ export async function getSipAccounts(userId: string) {
         const session = await getSession();
         if (!session?.user) throw new Error("Unauthorized");
 
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const isUuid = uuidRegex.test(userId);
+
         const profile = await prisma.profile.findFirst({
-            where: { userId }
+            where: isUuid
+                ? {
+                    OR: [
+                        { id: userId },
+                        { userId }
+                    ]
+                  }
+                : {
+                    userId
+                  }
         });
         if (!profile) return [];
 
