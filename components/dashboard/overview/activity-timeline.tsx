@@ -1,73 +1,33 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Phone } from "lucide-react";
+import { Phone, Activity } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveProfile, useActivities } from "@/hooks/use-data";
 import { useMemo } from "react";
+import { formatDistanceToNow } from "date-fns";
 
 const item = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0 },
 };
 
-export function ActivityTimeline() {
-    const { data: profile } = useActiveProfile();
-    const { data: activities, isLoading } = useActivities(5);
-
-    const isAdmin = profile?.role === "admin" || profile?.role === "manager";
-    const myActivities = useMemo(() => isAdmin ? activities : activities?.filter(a => a.createdById === profile?.id), [isAdmin, activities, profile?.id]);
-
-    if (isLoading) {
-        return (
-            <Card className="h-full">
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <Skeleton className="h-6 w-32" />
-                    <Skeleton className="h-8 w-20" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className="flex items-start gap-4 p-3">
-                            <Skeleton className="h-10 w-10 rounded-full" />
-                            <div className="flex-1 space-y-2">
-                                <Skeleton className="h-4 w-3/4" />
-                                <Skeleton className="h-3 w-1/2" />
-                            </div>
-                        </div>
-                    ))}
-                </CardContent>
-            </Card>
-        );
+function getActivityIcon(type: string) {
+    switch (type) {
+        case "call": return <Phone className="h-4 w-4 text-blue-500" />;
+        default: return <Activity className="h-4 w-4 text-muted-foreground" />;
     }
-
-    return (
-        <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between">
-"use client";
-
-import { motion } from "framer-motion";
-import { Phone } from "lucide-react";
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useActiveProfile, useActivities } from "@/hooks/use-data";
-import { useMemo } from "react";
-
-const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
-};
+}
 
 export function ActivityTimeline() {
     const { data: profile } = useActiveProfile();
     const { data: activities, isLoading } = useActivities(5);
 
     const isAdmin = profile?.role === "admin" || profile?.role === "manager";
-    const myActivities = useMemo(() => isAdmin ? activities : activities?.filter(a => a.createdById === profile?.id), [isAdmin, activities, profile?.id]);
+    const myActivities = useMemo(() => isAdmin ? activities : activities?.filter((a: any) => a.createdById === profile?.id), [isAdmin, activities, profile?.id]);
 
     if (isLoading) {
         return (
@@ -100,7 +60,7 @@ export function ActivityTimeline() {
                 </Link>
             </CardHeader>
             <CardContent className="space-y-4">
-                {Array.isArray(myActivities) && myActivities.map((activity) => (
+                {Array.isArray(myActivities) && myActivities.map((activity: any) => (
                     <motion.div
                         key={activity.id}
                         variants={item}
@@ -109,22 +69,25 @@ export function ActivityTimeline() {
                         className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"
                     >
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                            <Phone className="h-5 w-5 text-primary" />
+                            {getActivityIcon(activity.type)}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{activity.title}</p>
                             <p className="text-sm text-muted-foreground truncate">
                                 {activity.description}
                             </p>
+                            <span className="text-xs text-muted-foreground flex items-center mt-1">
+                                {activity.createdBy?.fullName || "System"} • {activity.createdAt ? formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true }) : ""}
+                            </span>
                         </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {new Date(activity.createdAt).toLocaleDateString()}
-                        </span>
                     </motion.div>
                 ))}
                 
                 {(!Array.isArray(myActivities) || myActivities.length === 0) && (
-                    <p className="text-center text-muted-foreground py-8">No recent activity.</p>
+                    <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
+                        <Activity className="h-8 w-8 mb-2 opacity-20" />
+                        <p>No recent activity</p>
+                    </div>
                 )}
             </CardContent>
         </Card>
