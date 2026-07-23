@@ -299,7 +299,7 @@ export class SipService {
                     store.updateQueueStatus(store.currentNumber, status);
                 }
 
-                useDialerStore.getState().endCall();
+                useDialerStore.getState().endCall(status);
             },
             ended: () => {
                 const id = accountId || this._activeUAId;

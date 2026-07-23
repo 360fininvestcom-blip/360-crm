@@ -71,6 +71,7 @@ export function CallWidget() {
         isInCall,
         currentNumber,
         callStatus,
+        lastCallStatus,
         callDuration,
         closeDialer,
         openDialer,
@@ -170,15 +171,21 @@ export function CallWidget() {
 
     useEffect(() => {
         let isMounted = true;
-        const interval = setInterval(async () => {
-            const { SipService } = await import("@/lib/services/sip-service");
+        let interval: ReturnType<typeof setInterval>;
+
+        import("@/lib/services/sip-service").then(({ SipService }) => {
             if (!isMounted) return;
             const sip = SipService.getInstance();
             setSipStatus(sip.isRegistered() ? "connected" : sip.isConnected() ? "connecting" : "disconnected");
-        }, 2000);
+            
+            interval = setInterval(() => {
+                setSipStatus(sip.isRegistered() ? "connected" : sip.isConnected() ? "connecting" : "disconnected");
+            }, 2000);
+        }).catch(err => console.error("Failed to load SipService in widget", err));
+
         return () => {
             isMounted = false;
-            clearInterval(interval);
+            if (interval) clearInterval(interval);
         };
     }, []);
 
@@ -201,8 +208,11 @@ export function CallWidget() {
         }
     }, [currentNumber, startCall, setCurrentNumber, selectedSipAccountId]);
 
-    const persistCallLog = useCallback(async (status: string) => {
+    const persistCallLog = useCallback(async () => {
+        const { currentNumber, callDuration, callStartedAt, lastCallStatus } = useDialerStore.getState();
         if (!currentNumber || !profile) return;
+
+        const status = lastCallStatus || "no-answer";
 
         // Persist to database
         if (contact?.id) {
@@ -219,8 +229,8 @@ export function CallWidget() {
 
         // Create call log - map status to CallLog enum
         let logStatus: "completed" | "missed" | "failed" | "no_answer" | "busy" = "failed";
-        if (status === "answered" || status === "completed" || status === "active") logStatus = "completed";
-        else if (status === "no-answer" || status === "no_answer") logStatus = "no_answer";
+        if (status === "answered") logStatus = "completed";
+        else if (status === "no-answer") logStatus = "no_answer";
         else if (status === "busy") logStatus = "busy";
 
         createCallLog({
@@ -238,7 +248,7 @@ export function CallWidget() {
         if (autoDialerActive) {
             updateQueueStatus(currentNumber, status as "answered" | "no-answer" | "busy" | "failed" | "skipped" | "forward" | "ringback" | "rejected");
         }
-    }, [currentNumber, contact, profile, callDuration, callStartedAt, autoDialerActive, updateContact, createCallLog, updateQueueStatus]);
+    }, [contact, profile, autoDialerActive, updateContact, createCallLog, updateQueueStatus]);
 
     const handleHangup = useCallback(async () => {
         const id = selectedSipAccountId || undefined;
@@ -251,10 +261,7 @@ export function CallWidget() {
     // Auto-persist calls when they reach 'ended' state
     useEffect(() => {
         if (callStatus === "ended" && prevCallStatusRef.current !== "ended") {
-            // Map the previous technical status to a human status if needed
-            // If we're ending an active call, it's 'answered'
-            const persistStatus = prevCallStatusRef.current === "active" ? "answered" : "no-answer";
-            persistCallLog(persistStatus);
+            persistCallLog();
         }
         prevCallStatusRef.current = callStatus;
     }, [callStatus, persistCallLog]);

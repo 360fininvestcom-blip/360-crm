@@ -39,6 +39,7 @@ interface DialerState {
     currentNumber: string;
     callDuration: number;
     callStatus: "idle" | "connecting" | "ringing" | "active" | "ended";
+    lastCallStatus: "answered" | "no-answer" | "busy" | "failed" | "rejected" | "skipped" | null;
     callStartedAt: string | null;
     callEndedAt: string | null;
     incomingCall: { callerNumber: string; jsep: unknown; handleId: number; name?: string } | null;
@@ -52,7 +53,7 @@ interface DialerState {
     answerIncomingCall: () => void;
     declineIncomingCall: () => void;
     startCall: () => void;
-    endCall: () => void;
+    endCall: (status?: "answered" | "no-answer" | "busy" | "failed" | "rejected" | "skipped") => void;
     setCallStatus: (status: DialerState["callStatus"]) => void;
     incrementCallDuration: () => void;
     startCallTimer: () => void;
@@ -82,6 +83,7 @@ export const useDialerStore = create(
             currentNumber: "",
             callDuration: 0,
             callStatus: "idle",
+            lastCallStatus: null,
             callStartedAt: null,
             callEndedAt: null,
             incomingCall: null,
@@ -95,7 +97,7 @@ export const useDialerStore = create(
             answerIncomingCall: () => {
                 const call = get().incomingCall;
                 if (!call) return;
-                set({ incomingCall: null, isOpen: true, isInCall: true, callStatus: "connecting", currentNumber: call.callerNumber, callDuration: 0 });
+                set({ incomingCall: null, isOpen: true, isInCall: true, callStatus: "connecting", currentNumber: call.callerNumber, callDuration: 0, lastCallStatus: null });
             },
             declineIncomingCall: () => {
                 set({ incomingCall: null });
@@ -106,11 +108,15 @@ export const useDialerStore = create(
                 callStatus: "connecting",
                 callDuration: 0,
                 callStartedAt: null,
-                callEndedAt: null
+                callEndedAt: null,
+                lastCallStatus: null
             }),
-            endCall: () => {
+            endCall: (status) => {
+                if (get().callStatus === "ended") return;
                 get().stopCallTimer();
-                set({ isInCall: false, callStatus: "ended", callEndedAt: new Date().toISOString() });
+                const currentStatus = get().callStatus;
+                const resolvedStatus = status || (currentStatus === "active" ? "answered" : "no-answer");
+                set({ isInCall: false, callStatus: "ended", callEndedAt: new Date().toISOString(), lastCallStatus: resolvedStatus });
             },
             setCallStatus: (status) => {
                 set({ callStatus: status });
