@@ -13,7 +13,10 @@ async function getAdminProfile() {
     if (profile.role !== "admin" && profile.role !== "manager") {
         throw new Error("Forbidden: Admin or Manager role required");
     }
-    return profile;
+    if (!profile.organizationId) {
+        throw new Error("Profile has no associated organization");
+    }
+    return profile as typeof profile & { organizationId: string };
 }
 
 // ============================================
