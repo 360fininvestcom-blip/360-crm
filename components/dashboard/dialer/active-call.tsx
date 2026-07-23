@@ -9,6 +9,7 @@ import { useWaveform } from "@/hooks/use-waveform";
 import { VoicemailUpload } from "./voicemail-upload";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useDialerStore } from "@/lib/stores";
 
 interface Contact {
     firstName: string;
@@ -47,6 +48,10 @@ export const ActiveCall = ({
     onHangup,
     onTransfer
 }: ActiveCallProps) => {
+    const { autoDialerActive, autoDialerQueue } = useDialerStore();
+    const completedCount = autoDialerQueue.filter(q => q.lastStatus).length;
+    const totalCount = autoDialerQueue.length;
+
     const [stream, setStream] = React.useState<MediaStream | null>(null);
     const visualizerRef = React.useRef<HTMLDivElement>(null);
     React.useEffect(() => {
@@ -115,7 +120,12 @@ export const ActiveCall = ({
                 ))}
             </div>
 
-            <div className="text-center">
+            <div className="text-center flex flex-col items-center">
+                {autoDialerActive && totalCount > 0 && (
+                    <div className="text-[9px] uppercase font-bold tracking-widest text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full mb-3 shadow-sm animate-pulse">
+                        Campaign: {completedCount + 1} of {totalCount} dials
+                    </div>
+                )}
                 <h3 className="font-semibold text-lg">{contact?.firstName || "Unknown"} {contact?.lastName || ""}</h3>
                 <p className="text-sm text-muted-foreground">{contact?.company || "Outbound Call"}</p>
                 <div className="mt-2 flex items-center justify-center gap-2">

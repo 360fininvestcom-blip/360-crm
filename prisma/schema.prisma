@@ -42,6 +42,8 @@ model Organization {
   userIntegrations UserIntegration[]
   salesCampaigns SalesCampaign[]
   announcements  Announcement[]
+  webForms       WebForm[]
+  callLogs       CallLog[]
 
   @@map("organizations")
 }
@@ -80,6 +82,7 @@ model Profile {
   sipProfiles   SipProfile[]
   files         File[]
   notes         Note[]
+  callLogs      CallLog[]
 
   @@map("profiles")
 }
@@ -181,6 +184,7 @@ model Contact {
   enrollments SequenceEnrollment[]
   files       File[]
   notes       Note[]
+  callLogs    CallLog[]
 
   @@index([organizationId], map: "idx_contacts_org")
   @@index([email], map: "idx_contacts_email")
@@ -594,4 +598,55 @@ model Announcement {
   @@unique([organizationId, slug], name: "org_slug_unique")
   @@index([organizationId], map: "idx_announcements_org")
   @@map("announcements")
+}
+
+// ============================================
+// WEB FORMS
+// ============================================
+model WebForm {
+  id               String       @id @default(uuid()) @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  description      String?
+  source           String?      @default("Web Form")
+  status           String?      @default("active")
+  config           Json?        @default("{}")
+  redirectUrl      String?      @map("redirect_url")
+  submitButtonText String?      @default("Submit") @map("submit_button_text")
+  successMessage   String?      @default("Thank you!") @map("success_message")
+  isActive         Boolean?     @default(true) @map("is_active")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("web_forms")
+}
+
+// ============================================
+// CALL LOGS
+// ============================================
+model CallLog {
+  id              String       @id @default(uuid()) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String       @map("user_id") @db.Uuid
+  user            Profile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId       String?      @map("contact_id") @db.Uuid
+  contact         Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  phoneNumber     String       @map("phone_number")
+  direction       String
+  status          String
+  durationSeconds Int          @default(0) @map("duration_seconds")
+  outcome         String?
+  notes           String?
+  recordingUrl    String?      @map("recording_url")
+  transcription   String?
+  summary         String?
+  startedAt       DateTime     @default(now()) @map("started_at") @db.Timestamptz
+  endedAt         DateTime?    @map("ended_at") @db.Timestamptz
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId], map: "idx_call_logs_org")
+  @@index([userId], map: "idx_call_logs_user")
+  @@map("call_logs")
 }

@@ -175,6 +175,8 @@ export interface CallLog {
     outcome?: string;
     notes?: string;
     recording_url?: string;
+    transcription?: string | null;
+    summary?: string | null;
     started_at: string;
     ended_at?: string;
     created_at: string;

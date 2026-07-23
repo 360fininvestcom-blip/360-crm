@@ -233,7 +233,7 @@ export function CallWidget() {
         else if (status === "no-answer") logStatus = "no_answer";
         else if (status === "busy") logStatus = "busy";
 
-        createCallLog({
+        const newLog = await createCallLog({
             contact_id: contact?.id || undefined,
             user_id: profile.id,
             organization_id: profile.organizationId!,
@@ -243,6 +243,14 @@ export function CallWidget() {
             duration_seconds: callDuration,
             started_at: callStartedAt || new Date().toISOString(),
         });
+
+        if (newLog?.id) {
+            import("@/actions/copilot").then(m => {
+                m.transcribeAndSummarizeCallLog(newLog.id).catch(err => {
+                    console.error("AI Copilot transcription background run failed:", err);
+                });
+            });
+        }
 
         // Update auto-dialer queue
         if (autoDialerActive) {

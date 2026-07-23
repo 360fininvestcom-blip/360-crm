@@ -3,95 +3,119 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { Prisma } from "@prisma/client";
 
-export async function getWebForms() {
+async function getAuthProfile() {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) throw new Error("Unauthorized");
     const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
     if (!profile) throw new Error("No active profile");
-    const organizationId = profile.organizationId;
+    if (!profile.organizationId) throw new Error("No organization associated with profile");
+    return profile as typeof profile & { organizationId: string };
+}
 
-    const forms = await prisma.$queryRaw`
-        SELECT * FROM web_forms
-        WHERE organization_id = CAST(${organizationId} AS UUID)
-        ORDER BY created_at DESC
-    `;
-    
-    return forms as any[];
+function mapWebForm(form: any) {
+    let schemaArray: any[] = [];
+    try {
+        if (form.config && typeof form.config === "object") {
+            schemaArray = Object.entries(form.config).map(([name, type]) => ({
+                name,
+                type,
+                label: name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+                required: true
+            }));
+        }
+    } catch (e) {
+        console.error("Failed to parse schema config:", e);
+    }
+
+    return {
+        id: form.id,
+        organization_id: form.organizationId,
+        name: form.name,
+        description: form.description || "",
+        source: form.source || "Web Form",
+        status: (form.status || "active") as "active" | "inactive",
+        config: (form.config || {}) as Record<string, string>,
+        redirect_url: form.redirectUrl || null,
+        submit_button_text: form.submitButtonText || "Submit",
+        success_message: form.successMessage || "Thank you for your submission!",
+        is_active: form.isActive ?? true,
+        created_at: form.createdAt.toISOString(),
+        schema: schemaArray
+    };
+}
+
+export async function getWebForms() {
+    try {
+        const profile = await getAuthProfile();
+        const forms = await prisma.webForm.findMany({
+            where: { organizationId: profile.organizationId },
+            orderBy: { createdAt: "desc" }
+        });
+        return forms.map(mapWebForm);
+    } catch (error) {
+        console.error("Failed to get web forms:", error);
+        return [];
+    }
 }
 
 export async function createWebForm(name: string, source: string, overrides: Record<string, any> = {}) {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) throw new Error("Unauthorized");
-    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
-    if (!profile) throw new Error("No active profile");
-    const organizationId = profile.organizationId;
+    const profile = await getAuthProfile();
 
     const config = { email: "email", name: "first_name" };
-
     const description = overrides.description || '';
     const submitText = overrides.submit_button_text || 'Submit';
     const successMsg = overrides.success_message || 'Thank you!';
 
-    const result = await prisma.$queryRaw`
-        INSERT INTO web_forms (organization_id, name, source, status, config, description, submit_button_text, success_message)
-        VALUES (
-            CAST(${organizationId} AS UUID),
-            ${name},
-            ${source},
-            'active',
-            ${config}::jsonb,
-            ${description},
-            ${submitText},
-            ${successMsg}
-        )
-        RETURNING *
-    `;
+    const form = await prisma.webForm.create({
+        data: {
+            organizationId: profile.organizationId,
+            name,
+            source,
+            status: "active",
+            config,
+            description,
+            submitButtonText: submitText,
+            successMessage: successMsg,
+            isActive: true
+        }
+    });
 
-    // @ts-ignore
-    return result[0];
+    return mapWebForm(form);
 }
 
 export async function updateWebForm(id: string, payload: Record<string, any>) {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) throw new Error("Unauthorized");
-    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
-    if (!profile) throw new Error("No active profile");
-    const organizationId = profile.organizationId;
+    const profile = await getAuthProfile();
 
-    // Dynamic update is tricky with queryRaw, but we only have a few fields
     const name = payload.name;
     const description = payload.description || '';
     const submitText = payload.submit_button_text || 'Submit';
     const successMsg = payload.success_message || 'Thank you!';
 
-    const result = await prisma.$queryRaw`
-        UPDATE web_forms 
-        SET 
-            name = ${name},
-            description = ${description},
-            submit_button_text = ${submitText},
-            success_message = ${successMsg}
-        WHERE id = CAST(${id} AS UUID)
-        AND organization_id = CAST(${organizationId} AS UUID)
-        RETURNING *
-    `;
+    const form = await prisma.webForm.update({
+        where: {
+            id,
+            organizationId: profile.organizationId
+        },
+        data: {
+            name,
+            description,
+            submitButtonText: submitText,
+            successMessage: successMsg
+        }
+    });
 
-    // @ts-ignore
-    return result[0];
+    return mapWebForm(form);
 }
 
 export async function deleteWebForm(id: string) {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) throw new Error("Unauthorized");
-    const profile = await prisma.profile.findFirst({ where: { userId: session.user.id } });
-    if (!profile) throw new Error("No active profile");
-    const organizationId = profile.organizationId;
+    const profile = await getAuthProfile();
 
-    await prisma.$executeRaw`
-        DELETE FROM web_forms
-        WHERE id = CAST(${id} AS UUID)
-        AND organization_id = CAST(${organizationId} AS UUID)
-    `;
+    await prisma.webForm.delete({
+        where: {
+            id,
+            organizationId: profile.organizationId
+        }
+    });
+    return { success: true };
 }
