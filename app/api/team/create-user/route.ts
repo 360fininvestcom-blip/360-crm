@@ -10,7 +10,13 @@ import { hash } from "bcrypt"; // Note: Need bcrypt installed, or let Better Aut
 
 export async function POST(request: NextRequest) {
     try {
-        const { email, password, full_name, role, phone, organization_id } = await request.json();
+        const body = await request.json();
+        const email = body.email;
+        const password = body.password;
+        const full_name = body.full_name || body.fullName;
+        const role = body.role;
+        const phone = body.phone;
+        const organization_id = body.organization_id || body.organizationId;
 
         // Validate required fields
         if (!email || !password || !full_name || !role || !organization_id) {
