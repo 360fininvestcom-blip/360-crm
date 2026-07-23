@@ -146,14 +146,15 @@ export async function POST(request: Request) {
         const admins = await prisma.profile.findMany({
             where: {
                 organizationId,
-                role: { in: ["admin", "manager"] }
+                role: { in: ["admin", "manager"] },
+                userId: { not: null }
             },
             select: { userId: true }
         });
 
         if (admins.length > 0) {
             const notifs = admins.map(a => ({
-                userId: a.userId,
+                userId: a.userId!,
                 title: "New Web Lead",
                 message: `${contact.firstName} ${contact.lastName || ""} from ${formName}`,
                 type: "lead",
