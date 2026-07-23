@@ -7,6 +7,12 @@ const LandingPageContent = nextDynamic(
   { ssr: false }
 );
 
-export function PageClientWrapper() {
-  return <LandingPageContent />;
+export function PageClientWrapper({
+  initialPosts,
+  initialCampaigns
+}: {
+  initialPosts: any[];
+  initialCampaigns: any[];
+}) {
+  return <LandingPageContent initialPosts={initialPosts} initialCampaigns={initialCampaigns} />;
 }

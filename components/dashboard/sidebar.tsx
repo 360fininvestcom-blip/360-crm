@@ -19,6 +19,7 @@ import {
     BarChart3,
     CheckSquare,
     History as HistoryIcon,
+    Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ const navigation: NavItem[] = [
     { name: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
     { name: "Team", href: "/dashboard/team", icon: Users, roles: ["admin", "manager"] },
     { name: "Automations", href: "/dashboard/automations", icon: Zap, roles: ["admin", "manager"] },
+    { name: "CMS Panel", href: "/dashboard/admin/cms", icon: Globe, roles: ["admin", "manager"] },
 ];
 
 const bottomNavigation: NavItem[] = [

@@ -40,6 +40,8 @@ model Organization {
   contactStatuses  ContactStatus[]
   apiKeys          ApiKey[]
   userIntegrations UserIntegration[]
+  donationCampaigns DonationCampaign[]
+  blogPosts         BlogPost[]
 
   @@map("organizations")
 }
@@ -553,4 +555,43 @@ model Notification {
   @@index([userId], map: "idx_notifications_user")
   @@index([createdAt(sort: Desc)], map: "idx_notifications_created")
   @@map("notifications")
+}
+
+// ============================================
+// DONATION CAMPAIGNS
+// ============================================
+model DonationCampaign {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  goalAmount     Decimal      @default(0) @db.Decimal(15, 2) @map("goal_amount")
+  currentAmount  Decimal      @default(0) @db.Decimal(15, 2) @map("current_amount")
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([organizationId], map: "idx_campaigns_org")
+  @@map("donation_campaigns")
+}
+
+// ============================================
+// BLOG POSTS
+// ============================================
+model BlogPost {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  slug           String
+  content        String
+  coverImageUrl  String?      @map("cover_image_url")
+  published      Boolean      @default(false)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([organizationId, slug], name: "org_slug_unique")
+  @@index([organizationId], map: "idx_posts_org")
+  @@map("blog_posts")
 }

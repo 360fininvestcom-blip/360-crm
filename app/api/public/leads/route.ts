@@ -38,39 +38,60 @@ export async function POST(request: Request) {
             }
         }
 
-        if (!formId) {
-            console.log("DEBUG: Returning 400 - missing formId");
-            return NextResponse.json({ error: "Missing Form ID" }, { status: 400 });
+        // 2. Fetch Form Configuration
+        let form: any = null;
+        if (formId) {
+            try {
+                // @ts-ignore
+                const forms = await prisma.$queryRaw`
+                    SELECT * FROM web_forms 
+                    WHERE id = ${formId}::uuid AND status = 'active'
+                    LIMIT 1
+                `;
+                // @ts-ignore
+                if (forms && forms.length > 0) {
+                    // @ts-ignore
+                    form = forms[0];
+                }
+            } catch (dbError) {
+                console.log("DEBUG: web_forms query failed or empty, using fallback");
+            }
         }
 
-        // 2. Fetch Form Configuration
-                // @ts-ignore
-        const forms: WebForm[] = await prisma.$queryRaw`
-            SELECT * FROM web_forms 
-            WHERE id = ${formId}::uuid AND status = 'active'
-            LIMIT 1
-        `;
-        const form = forms[0];
+        let organizationId: string;
+        let tags: string[] = ["Web Lead"];
+        let source: string = "Web Form";
+        let redirectUrl: string | null = null;
+        let fieldMapping: Record<string, string> = {};
+        const formName = form ? form.name : "Public Web Form";
 
-        if (!form) {
-            return NextResponse.json(
-                { error: "Invalid form ID or form is inactive" },
-                { status: 404 }
-            );
+        if (form) {
+            organizationId = form.organizationId;
+            tags = ["Web Lead", form.name];
+            source = form.source || "Web Form";
+            redirectUrl = form.redirectUrl;
+            fieldMapping = (form.config as Record<string, string>) || {};
+        } else {
+            const firstOrg = await prisma.organization.findFirst();
+            if (!firstOrg) {
+                return NextResponse.json({ error: "No organization configured in CRM" }, { status: 400 });
+            }
+            organizationId = firstOrg.id;
+            tags = ["Web Lead", "Public Sign-Up"];
+            source = "Landing Page";
         }
 
         // 6. Map Fields
-        const fieldMapping = (form.config as Record<string, string>) || {};
         const contactData: Record<string, any> = {
-            organizationId: form.organizationId,
-            tags: ["Web Lead", form.name],
-            source: form.source || "Web Form",
+            organizationId,
+            tags,
+            source,
             customFields: {
                 status: "New"
             }
         };
 
-        const basicFields = ["first_name", "last_name", "email", "phone", "company", "job_title"];
+        const basicFields = ["first_name", "last_name", "email", "phone", "company", "job_title", "first", "last", "message"];
 
         // Explicit mapping
         Object.entries(fieldMapping).forEach(([formField, dbField]) => {
@@ -85,10 +106,26 @@ export async function POST(request: Request) {
             basicFields.forEach(field => {
                 const val = body[field] || body[field.replace('_', '')] || body[field.replace('_', ' ')];
                 if (val) {
-                    const camelField = field.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-                    contactData[camelField] = val;
+                    let camelField = field.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+                    if (camelField === "first") camelField = "firstName";
+                    if (camelField === "last") camelField = "lastName";
+                    if (camelField === "message") {
+                        contactData.customFields = {
+                            ...contactData.customFields,
+                            message: val
+                        };
+                    } else {
+                        contactData[camelField] = val;
+                    }
                 }
             });
+        }
+
+        // Support firstName/lastName direct parameters
+        if (body.firstName) contactData.firstName = body.firstName;
+        if (body.lastName) contactData.lastName = body.lastName;
+        if (!contactData.firstName) {
+            contactData.firstName = body.name || body.fullName || "Anonymous";
         }
 
         // 7. Insert Contact
@@ -108,7 +145,7 @@ export async function POST(request: Request) {
         // 8. Create Notification for Admins
         const admins = await prisma.profile.findMany({
             where: {
-                organizationId: form.organizationId,
+                organizationId,
                 role: { in: ["admin", "manager"] }
             },
             select: { userId: true }
@@ -116,10 +153,10 @@ export async function POST(request: Request) {
 
         if (admins.length > 0) {
             const notifs = admins.map(a => ({
-                organizationId: form.organizationId,
+                organizationId,
                 userId: a.userId,
                 title: "New Web Lead",
-                message: `${contact.firstName} ${contact.lastName || ""} from ${form.name}`,
+                message: `${contact.firstName} ${contact.lastName || ""} from ${formName}`,
                 type: "lead",
                 link: `/dashboard/contacts/${contact.id}`
             }));
@@ -131,9 +168,9 @@ export async function POST(request: Request) {
         // 9. Trigger Automation
         try {
             const { evaluateTriggers } = require("@/lib/automations/engine");
-            await evaluateTriggers("lead_created", form.organizationId, {
+            await evaluateTriggers("lead_created", organizationId, {
                 contactId: contact.id,
-                formId: form.id,
+                formId: form?.id || "default",
                 ...body
             });
         } catch (autoError) {
@@ -141,8 +178,8 @@ export async function POST(request: Request) {
         }
 
         // 10. Response / Redirect
-        if (form.redirectUrl) {
-            return NextResponse.redirect(new URL(form.redirectUrl), 302);
+        if (redirectUrl) {
+            return NextResponse.redirect(new URL(redirectUrl), 302);
         }
 
         return NextResponse.json({ success: true, id: contact.id }, { status: 200 });
