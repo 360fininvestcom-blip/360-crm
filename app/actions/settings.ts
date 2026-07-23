@@ -27,28 +27,48 @@ export async function getProfiles() {
     });
 }
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getOrganization(id: string) {
-    const session = await getSession();
-    if (!session?.user) throw new Error("Unauthorized");
-    return await prisma.organization.findUnique({
-        where: { id }
-    });
+    try {
+        const session = await getSession();
+        if (!session?.user) throw new Error("Unauthorized");
+        if (!id || !uuidRegex.test(id)) return null;
+        return await prisma.organization.findUnique({
+            where: { id }
+        });
+    } catch (error) {
+        console.error("[getOrganization] Error fetching organization:", error);
+        return null;
+    }
 }
 
 export async function getApiKeys(orgId: string) {
-    const session = await getSession();
-    if (!session?.user) throw new Error("Unauthorized");
-    return await prisma.apiKey.findFirst({
-        where: { organizationId: orgId }
-    });
+    try {
+        const session = await getSession();
+        if (!session?.user) throw new Error("Unauthorized");
+        if (!orgId || !uuidRegex.test(orgId)) return null;
+        return await prisma.apiKey.findFirst({
+            where: { organizationId: orgId }
+        });
+    } catch (error) {
+        console.error("[getApiKeys] Error fetching API keys:", error);
+        return null;
+    }
 }
 
 export async function getIntegrations(userId: string) {
-    const session = await getSession();
-    if (!session?.user) throw new Error("Unauthorized");
-    return await prisma.userIntegration.findMany({
-        where: { userId }
-    });
+    try {
+        const session = await getSession();
+        if (!session?.user) throw new Error("Unauthorized");
+        if (!userId || !uuidRegex.test(userId)) return [];
+        return await prisma.userIntegration.findMany({
+            where: { userId }
+        });
+    } catch (error) {
+        console.error("[getIntegrations] Error fetching integrations:", error);
+        return [];
+    }
 }
 
 export async function updateProfile(id: string, updates: Partial<Profile>) {
@@ -105,7 +125,6 @@ export async function getSipAccounts(userId: string) {
         const session = await getSession();
         if (!session?.user) throw new Error("Unauthorized");
 
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         const isUuid = uuidRegex.test(userId);
 
         const profile = await prisma.profile.findFirst({
@@ -187,7 +206,6 @@ export async function getTwilioConfig(orgId: string) {
         const session = await getSession();
         if (!session?.user) throw new Error("Unauthorized");
 
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!orgId || !uuidRegex.test(orgId)) {
             console.warn(`[getTwilioConfig] Invalid organization ID: ${orgId}`);
             return null;
