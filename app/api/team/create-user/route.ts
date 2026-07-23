@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { hash } from "bcrypt"; // Note: Need bcrypt installed, or let Better Auth handle it
 // Better Auth does not expose a server-side admin create user easily right now without session.
 // We'll create the user directly in DB or throw "Not Implemented for Better Auth" if complex.
 // For now, let's just insert directly into the database using Prisma and a simple hash 
@@ -68,49 +67,34 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Hash password with bcrypt (10 rounds is standard)
-        let hashedPassword = password;
-        try {
-            hashedPassword = await hash(password, 10);
-        } catch(e) {
-            console.warn("bcrypt hash failed, maybe bcrypt is not installed. Saving plaintext (NOT RECOMMENDED).", e);
+        // Step 1: Create the user via Better Auth native API so password hashing matches Better Auth expectations
+        const authUser = await auth.api.signUpEmail({
+            body: {
+                email,
+                password,
+                name: full_name
+            }
+        });
+
+        if (!authUser || !authUser.user) {
+            throw new Error("Failed to create user via authentication provider");
         }
 
-        // Step 1: Create the user in Prisma (Better Auth compatible)
-        const newUser = await prisma.user.create({
+        // Step 2: Create the associated Profile for this user
+        const newProfile = await prisma.profile.create({
             data: {
+                userId: authUser.user.id,
+                organizationId: organization_id,
+                fullName: full_name,
                 email: email,
-                name: full_name,
-                emailVerified: true, // Auto-confirm email so they can log in immediately
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                accounts: {
-                    create: {
-                        accountId: email,
-                        providerId: 'credential',
-                        password: hashedPassword,
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    }
-                },
-                profile: {
-                    create: {
-                        organizationId: organization_id,
-                        fullName: full_name,
-                        email: email,
-                        role: role,
-                    }
-                }
-            },
-            include: {
-                profile: true
+                role: role,
             }
         });
 
         return NextResponse.json({
             success: true,
-            userId: newUser.id,
-            profileId: (newUser as any).profile?.id,
+            userId: authUser.user.id,
+            profileId: newProfile.id,
             message: `User ${full_name} created successfully`,
         });
 
