@@ -14,9 +14,10 @@ import {
   Shield,
   CheckCircle2,
   Calendar,
-  DollarSign,
-  Heart,
-  Loader2
+  TrendingUp,
+  Megaphone,
+  Loader2,
+  CalendarCheck2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -89,34 +90,34 @@ const testimonials = [
 const defaultCampaigns = [
   {
     id: "default-1",
-    title: "Clean Water Initiative",
-    description: "Building pipelines and solar-powered wells to bring clean, drinkable water to underserved regions.",
-    goalAmount: 25000,
-    currentAmount: 18450
+    title: "Enterprise Deal Rush",
+    description: "Our dedicated campaign targeting mid-market and enterprise CRM migrations for Q3.",
+    targetRevenue: 100000,
+    currentRevenue: 74200
   },
   {
     id: "default-2",
-    title: "Education For All",
-    description: "Funding classrooms, books, and scholarship programs for low-income children.",
-    goalAmount: 15000,
-    currentAmount: 6200
+    title: "SME Package Promotion",
+    description: "Onboarding local small-to-medium businesses onto our standard tier with discounted SIP rates.",
+    targetRevenue: 40000,
+    currentRevenue: 18500
   }
 ];
 
-const defaultPosts = [
+const defaultAnnouncements = [
   {
     id: "default-post-1",
-    title: "Announcing Our 2026 Impact Report",
-    slug: "announcing-our-2026-impact-report",
-    content: "We are thrilled to share our annual impact report! Through our campaigns, we have provided clean water and education to over 10,000 children this year.",
-    createdAt: "2026-06-15T00:00:00Z"
+    title: "Announcing Version 4.2 Release",
+    slug: "announcing-version-4-2-release",
+    content: "We've rolled out advanced WebRTC fallback pipelines, updated SIP registration status checks, and optimized audio visualizer rendering speeds.",
+    createdAt: "2026-07-15T00:00:00Z"
   },
   {
     id: "default-post-2",
-    title: "Volunteers Build New Schoolhouse",
-    slug: "volunteers-build-new-schoolhouse",
-    content: "A group of 30 dedicated volunteers completed our new school building project, creating a safe learning environment for the community.",
-    createdAt: "2026-07-01T00:00:00Z"
+    title: "New AI Copilot Beta Now Available",
+    slug: "new-ai-copilot-beta-now-available",
+    content: "Close deals faster with automated summaries, predictive scoring algorithms, and instant context generation directly on active calls.",
+    createdAt: "2026-07-20T00:00:00Z"
   }
 ];
 
@@ -124,18 +125,19 @@ export default function LandingPageContent({
   initialPosts = [],
   initialCampaigns = []
 }: LandingPageProps) {
-  const posts = initialPosts.length > 0 ? initialPosts : defaultPosts;
+  const announcements = initialPosts.length > 0 ? initialPosts : defaultAnnouncements;
   const campaigns = initialCampaigns.length > 0 ? initialCampaigns : defaultCampaigns;
 
-  // Volunteer form state
+  // Book a demo form state
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const handleVolunteerSubmit = async (e: React.FormEvent) => {
+  const handleDemoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstName || !email) {
       toast.error("First Name and Email are required");
@@ -154,18 +156,20 @@ export default function LandingPageContent({
           lastName,
           email,
           phone,
+          company,
           message
         })
       });
       if (response.ok) {
-        toast.success("Thank you for signing up! We will contact you soon.");
+        toast.success("Thank you! Your demo booking request has been submitted. Our sales team will reach out shortly.");
         setFirstName("");
         setLastName("");
         setEmail("");
         setPhone("");
+        setCompany("");
         setMessage("");
       } else {
-        toast.error("Failed to submit application");
+        toast.error("Failed to submit request");
       }
     } catch (err) {
       toast.error("Submission error. Please try again.");
@@ -209,8 +213,8 @@ export default function LandingPageContent({
                 </Link>
               </Button>
               <Button size="lg" variant="outline" className="w-full sm:w-auto" asChild>
-                <Link href="#features">
-                  See Features
+                <Link href="#demo">
+                  Book a Demo
                 </Link>
               </Button>
             </div>
@@ -239,7 +243,7 @@ export default function LandingPageContent({
         </div>
       </section>
 
-      {/* Campaigns Section */}
+      {/* Sales Campaigns Section */}
       <section id="campaigns" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
         <div className="max-w-7xl mx-auto">
           <ClientMotion
@@ -249,19 +253,19 @@ export default function LandingPageContent({
             className="text-center mb-16"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Our Active
-              <span className="text-primary"> Donation Campaigns</span>
+              Active Sales
+              <span className="text-primary"> Campaigns</span>
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Track our current progression and support our active community campaigns.
+              Track our current live marketing promotions and target revenue acquisitions.
             </p>
           </ClientMotion>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
             {campaigns.map((camp, index) => {
-              const goal = camp.goalAmount || 1;
-              const current = camp.currentAmount || 0;
-              const percent = Math.min(Math.round((current / goal) * 100), 100);
+              const target = camp.targetRevenue || 1;
+              const current = camp.currentRevenue || 0;
+              const percent = Math.min(Math.round((current / target) * 100), 100);
 
               return (
                 <ClientMotion
@@ -274,8 +278,8 @@ export default function LandingPageContent({
                   <Card className="h-full hover:shadow-lg transition-shadow glass-panel">
                     <CardHeader>
                       <div className="flex items-center gap-2 text-primary mb-2">
-                        <Heart className="h-5 w-5 fill-current" />
-                        <span className="font-semibold tracking-wider text-xs uppercase">Fundraiser</span>
+                        <TrendingUp className="h-5 w-5" />
+                        <span className="font-semibold tracking-wider text-xs uppercase">Target Progress</span>
                       </div>
                       <CardTitle className="text-xl font-bold">{camp.title}</CardTitle>
                       <CardDescription>{camp.description}</CardDescription>
@@ -283,17 +287,14 @@ export default function LandingPageContent({
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm font-semibold">
-                          <span>Raised: ${current.toLocaleString()}</span>
-                          <span className="text-muted-foreground">Goal: ${goal.toLocaleString()}</span>
+                          <span>Revenue: ${current.toLocaleString()}</span>
+                          <span className="text-muted-foreground">Target: ${target.toLocaleString()}</span>
                         </div>
                         <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
                           <div className="bg-primary h-full transition-all duration-500" style={{ width: `${percent}%` }} />
                         </div>
-                        <div className="flex justify-between text-xs font-semibold text-muted-foreground">
-                          <span>{percent}% Complete</span>
-                          <Button size="sm" variant="link" className="p-0 h-auto font-bold text-primary">
-                            Donate Now <ArrowRight className="h-3 w-3 ml-1" />
-                          </Button>
+                        <div className="text-xs font-semibold text-muted-foreground text-right">
+                          <span>{percent}% of Target Met</span>
                         </div>
                       </div>
                     </CardContent>
@@ -324,8 +325,8 @@ export default function LandingPageContent({
         </div>
       </section>
 
-      {/* News & Blog Section */}
-      <section id="blog" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
+      {/* Announcements Section */}
+      <section id="announcements" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
         <div className="max-w-7xl mx-auto">
           <ClientMotion
             initial={{ opacity: 0 }}
@@ -334,16 +335,16 @@ export default function LandingPageContent({
             className="text-center mb-16"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Latest News &
-              <span className="text-primary"> Press Releases</span>
+              Latest
+              <span className="text-primary"> Announcements</span>
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Follow along with our journey and read about recent impact stories.
+              Follow along with our release notes, company announcements, and feature updates.
             </p>
           </ClientMotion>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {posts.map((post) => (
+            {announcements.map((post) => (
               <Card key={post.id} className="flex flex-col justify-between hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="text-lg font-bold">{post.title}</CardTitle>
@@ -354,7 +355,7 @@ export default function LandingPageContent({
                 <CardContent className="space-y-4">
                   <p className="text-muted-foreground text-sm line-clamp-3">{post.content}</p>
                   <Button variant="link" size="sm" className="p-0 h-auto text-primary font-semibold">
-                    Read Full Story <ArrowRight className="h-3 w-3 ml-1" />
+                    Read Update <ArrowRight className="h-3 w-3 ml-1" />
                   </Button>
                 </CardContent>
               </Card>
@@ -363,48 +364,54 @@ export default function LandingPageContent({
         </div>
       </section>
 
-      {/* Volunteer Signup Form */}
-      <section id="volunteer" className="py-20 px-4 sm:px-6 lg:px-8">
+      {/* Book a Demo Section */}
+      <section id="demo" className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold">Join Us as a Volunteer</h2>
-            <p className="text-muted-foreground mt-2">Help make a change in communities. Fill out the application below.</p>
+            <h2 className="text-3xl font-bold">Book a Live Product Demo</h2>
+            <p className="text-muted-foreground mt-2">See how our AI dialer and automated pipelines can scale your sales operations.</p>
           </div>
 
           <Card className="glass-panel border-white/5">
             <CardContent className="p-6">
-              <form onSubmit={handleVolunteerSubmit} className="space-y-4">
+              <form onSubmit={handleDemoSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label htmlFor="vfirst" className="text-xs font-semibold text-muted-foreground uppercase">First Name *</label>
-                    <Input id="vfirst" required placeholder="John" value={firstName} onChange={e => setFirstName(e.target.value)} />
+                    <label htmlFor="dfirst" className="text-xs font-semibold text-muted-foreground uppercase">First Name *</label>
+                    <Input id="dfirst" required placeholder="John" value={firstName} onChange={e => setFirstName(e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <label htmlFor="vlast" className="text-xs font-semibold text-muted-foreground uppercase">Last Name</label>
-                    <Input id="vlast" placeholder="Doe" value={lastName} onChange={e => setLastName(e.target.value)} />
+                    <label htmlFor="dlast" className="text-xs font-semibold text-muted-foreground uppercase">Last Name</label>
+                    <Input id="dlast" placeholder="Doe" value={lastName} onChange={e => setLastName(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="demail" className="text-xs font-semibold text-muted-foreground uppercase">Work Email *</label>
+                    <Input id="demail" type="email" required placeholder="john@company.com" value={email} onChange={e => setEmail(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="dphone" className="text-xs font-semibold text-muted-foreground uppercase">Phone Number</label>
+                    <Input id="dphone" placeholder="+1 (555) 123-4567" value={phone} onChange={e => setPhone(e.target.value)} />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label htmlFor="vemail" className="text-xs font-semibold text-muted-foreground uppercase">Email *</label>
-                  <Input id="vemail" type="email" required placeholder="john.doe@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+                  <label htmlFor="dcompany" className="text-xs font-semibold text-muted-foreground uppercase">Company Name</label>
+                  <Input id="dcompany" placeholder="Acme Corp" value={company} onChange={e => setCompany(e.target.value)} />
                 </div>
 
                 <div className="space-y-1">
-                  <label htmlFor="vphone" className="text-xs font-semibold text-muted-foreground uppercase">Phone Number</label>
-                  <Input id="vphone" placeholder="+1 (555) 123-4567" value={phone} onChange={e => setPhone(e.target.value)} />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="vmsg" className="text-xs font-semibold text-muted-foreground uppercase">Why do you want to join? (Message)</label>
-                  <Textarea id="vmsg" placeholder="Tell us about yourself..." rows={3} value={message} onChange={e => setMessage(e.target.value)} />
+                  <label htmlFor="dmsg" className="text-xs font-semibold text-muted-foreground uppercase">Sales Goals or Requirements</label>
+                  <Textarea id="dmsg" placeholder="Tell us about your sales volume, agent seats, or requirements..." rows={3} value={message} onChange={e => setMessage(e.target.value)} />
                 </div>
 
                 <Button type="submit" disabled={submitting} className="w-full h-12 bg-primary hover:bg-primary/95 text-white rounded-xl shadow-lg mt-2">
                   {submitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    "Submit Application"
+                    "Request Live Demo"
                   )}
                 </Button>
               </form>

@@ -20,23 +20,23 @@ async function getAdminProfile() {
 }
 
 // ============================================
-// BLOG POSTS
+// ANNOUNCEMENTS
 // ============================================
 
-export async function getBlogPosts() {
+export async function getAnnouncements() {
     try {
         const profile = await getAdminProfile();
-        return await prisma.blogPost.findMany({
+        return await prisma.announcement.findMany({
             where: { organizationId: profile.organizationId },
             orderBy: { createdAt: "desc" }
         });
     } catch (error) {
-        console.error("Failed to get blog posts:", error);
+        console.error("Failed to get announcements:", error);
         return [];
     }
 }
 
-export async function createBlogPost(data: {
+export async function createAnnouncement(data: {
     title: string;
     slug: string;
     content: string;
@@ -44,17 +44,17 @@ export async function createBlogPost(data: {
     published?: boolean;
 }) {
     const profile = await getAdminProfile();
-    const post = await prisma.blogPost.create({
+    const ann = await prisma.announcement.create({
         data: {
             ...data,
             organizationId: profile.organizationId,
         }
     });
     revalidatePath("/");
-    return post;
+    return ann;
 }
 
-export async function updateBlogPost(id: string, updates: {
+export async function updateAnnouncement(id: string, updates: {
     title?: string;
     slug?: string;
     content?: string;
@@ -62,17 +62,17 @@ export async function updateBlogPost(id: string, updates: {
     published?: boolean;
 }) {
     const profile = await getAdminProfile();
-    const post = await prisma.blogPost.update({
+    const ann = await prisma.announcement.update({
         where: { id, organizationId: profile.organizationId },
         data: updates
     });
     revalidatePath("/");
-    return post;
+    return ann;
 }
 
-export async function deleteBlogPost(id: string) {
+export async function deleteAnnouncement(id: string) {
     const profile = await getAdminProfile();
-    await prisma.blogPost.delete({
+    await prisma.announcement.delete({
         where: { id, organizationId: profile.organizationId }
     });
     revalidatePath("/");
@@ -80,34 +80,34 @@ export async function deleteBlogPost(id: string) {
 }
 
 // ============================================
-// DONATION CAMPAIGNS
+// SALES CAMPAIGNS
 // ============================================
 
-export async function getDonationCampaigns() {
+export async function getSalesCampaigns() {
     try {
         const profile = await getAdminProfile();
-        return await prisma.donationCampaign.findMany({
+        return await prisma.salesCampaign.findMany({
             where: { organizationId: profile.organizationId },
             orderBy: { createdAt: "desc" }
         });
     } catch (error) {
-        console.error("Failed to get donation campaigns:", error);
+        console.error("Failed to get sales campaigns:", error);
         return [];
     }
 }
 
-export async function createDonationCampaign(data: {
+export async function createSalesCampaign(data: {
     title: string;
     description?: string;
-    goalAmount: number;
+    targetRevenue: number;
     isActive?: boolean;
 }) {
     const profile = await getAdminProfile();
-    const campaign = await prisma.donationCampaign.create({
+    const campaign = await prisma.salesCampaign.create({
         data: {
             title: data.title,
             description: data.description,
-            goalAmount: data.goalAmount,
+            targetRevenue: data.targetRevenue,
             isActive: data.isActive ?? true,
             organizationId: profile.organizationId
         }
@@ -116,21 +116,21 @@ export async function createDonationCampaign(data: {
     return campaign;
 }
 
-export async function updateDonationCampaign(id: string, updates: {
+export async function updateSalesCampaign(id: string, updates: {
     title?: string;
     description?: string;
-    goalAmount?: number;
-    currentAmount?: number;
+    targetRevenue?: number;
+    currentRevenue?: number;
     isActive?: boolean;
 }) {
     const profile = await getAdminProfile();
-    const campaign = await prisma.donationCampaign.update({
+    const campaign = await prisma.salesCampaign.update({
         where: { id, organizationId: profile.organizationId },
         data: {
             title: updates.title,
             description: updates.description,
-            goalAmount: updates.goalAmount,
-            currentAmount: updates.currentAmount,
+            targetRevenue: updates.targetRevenue,
+            currentRevenue: updates.currentRevenue,
             isActive: updates.isActive
         }
     });
@@ -138,9 +138,9 @@ export async function updateDonationCampaign(id: string, updates: {
     return campaign;
 }
 
-export async function deleteDonationCampaign(id: string) {
+export async function deleteSalesCampaign(id: string) {
     const profile = await getAdminProfile();
-    await prisma.donationCampaign.delete({
+    await prisma.salesCampaign.delete({
         where: { id, organizationId: profile.organizationId }
     });
     revalidatePath("/");

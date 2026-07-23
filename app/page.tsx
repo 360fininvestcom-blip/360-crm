@@ -4,38 +4,38 @@ import { PageClientWrapper } from "./page-client-wrapper";
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
-  const posts = await prisma.blogPost.findMany({
+  const announcements = await prisma.announcement.findMany({
     where: { published: true },
     orderBy: { createdAt: "desc" },
     take: 3
   });
 
-  const campaigns = await prisma.donationCampaign.findMany({
+  const campaigns = await prisma.salesCampaign.findMany({
     where: { isActive: true },
     orderBy: { createdAt: "desc" }
   });
 
-  const serializedPosts = posts.map(p => ({
-    id: p.id,
-    title: p.title,
-    slug: p.slug,
-    content: p.content,
-    coverImageUrl: p.coverImageUrl,
-    published: p.published,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString()
+  const serializedAnnouncements = announcements.map(a => ({
+    id: a.id,
+    title: a.title,
+    slug: a.slug,
+    content: a.content,
+    coverImageUrl: a.coverImageUrl,
+    published: a.published,
+    createdAt: a.createdAt.toISOString(),
+    updatedAt: a.updatedAt.toISOString()
   }));
 
   const serializedCampaigns = campaigns.map(c => ({
     id: c.id,
     title: c.title,
     description: c.description,
-    goalAmount: parseFloat(c.goalAmount.toString()),
-    currentAmount: parseFloat(c.currentAmount.toString()),
+    targetRevenue: parseFloat(c.targetRevenue.toString()),
+    currentRevenue: parseFloat(c.currentRevenue.toString()),
     isActive: c.isActive,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString()
   }));
 
-  return <PageClientWrapper initialPosts={serializedPosts} initialCampaigns={serializedCampaigns} />;
+  return <PageClientWrapper initialPosts={serializedAnnouncements} initialCampaigns={serializedCampaigns} />;
 }

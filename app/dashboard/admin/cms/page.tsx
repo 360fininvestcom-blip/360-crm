@@ -13,7 +13,9 @@ import {
     Globe,
     Check,
     Loader2,
-    CheckCircle2
+    CheckCircle2,
+    Megaphone,
+    TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,50 +28,50 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
-    getBlogPosts,
-    createBlogPost,
-    updateBlogPost,
-    deleteBlogPost,
-    getDonationCampaigns,
-    createDonationCampaign,
-    updateDonationCampaign,
-    deleteDonationCampaign
+    getAnnouncements,
+    createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
+    getSalesCampaigns,
+    createSalesCampaign,
+    updateSalesCampaign,
+    deleteSalesCampaign
 } from "@/actions/cms";
 
 export default function AdminCmsPage() {
-    const [activeTab, setActiveTab] = useState("blog");
+    const [activeTab, setActiveTab] = useState("announcements");
     const [loading, setLoading] = useState(true);
 
-    // Blog states
-    const [posts, setPosts] = useState<any[]>([]);
-    const [blogSearch, setBlogSearch] = useState("");
-    const [isBlogDialogOpen, setIsBlogDialogOpen] = useState(false);
-    const [selectedPost, setSelectedPost] = useState<any | null>(null);
-    const [blogTitle, setBlogTitle] = useState("");
-    const [blogSlug, setBlogSlug] = useState("");
-    const [blogContent, setBlogContent] = useState("");
-    const [blogCover, setBlogCover] = useState("");
-    const [blogPublished, setBlogPublished] = useState(false);
+    // Announcement states
+    const [anns, setAnns] = useState<any[]>([]);
+    const [annSearch, setAnnSearch] = useState("");
+    const [isAnnDialogOpen, setIsAnnDialogOpen] = useState(false);
+    const [selectedAnn, setSelectedAnn] = useState<any | null>(null);
+    const [annTitle, setAnnTitle] = useState("");
+    const [annSlug, setAnnSlug] = useState("");
+    const [annContent, setAnnContent] = useState("");
+    const [annCover, setAnnCover] = useState("");
+    const [annPublished, setAnnPublished] = useState(false);
 
-    // Campaign states
+    // Sales Campaign states
     const [campaigns, setCampaigns] = useState<any[]>([]);
     const [campSearch, setCampSearch] = useState("");
     const [isCampDialogOpen, setIsCampDialogOpen] = useState(false);
     const [selectedCamp, setSelectedCamp] = useState<any | null>(null);
     const [campTitle, setCampTitle] = useState("");
     const [campDesc, setCampDesc] = useState("");
-    const [campGoal, setCampGoal] = useState("");
+    const [campTarget, setCampTarget] = useState("");
     const [campCurrent, setCampCurrent] = useState("");
     const [campActive, setCampActive] = useState(true);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const [fetchedPosts, fetchedCamps] = await Promise.all([
-                getBlogPosts(),
-                getDonationCampaigns()
+            const [fetchedAnns, fetchedCamps] = await Promise.all([
+                getAnnouncements(),
+                getSalesCampaigns()
             ]);
-            setPosts(fetchedPosts);
+            setAnns(fetchedAnns);
             setCampaigns(fetchedCamps);
         } catch (error) {
             toast.error("Failed to load CMS content");
@@ -82,66 +84,66 @@ export default function AdminCmsPage() {
         loadData();
     }, []);
 
-    // Blog handlers
-    const handleOpenBlogDialog = (post: any | null = null) => {
-        setSelectedPost(post);
-        if (post) {
-            setBlogTitle(post.title);
-            setBlogSlug(post.slug);
-            setBlogContent(post.content);
-            setBlogCover(post.coverImageUrl || "");
-            setBlogPublished(post.published);
+    // Announcement handlers
+    const handleOpenAnnDialog = (ann: any | null = null) => {
+        setSelectedAnn(ann);
+        if (ann) {
+            setAnnTitle(ann.title);
+            setAnnSlug(ann.slug);
+            setAnnContent(ann.content);
+            setAnnCover(ann.coverImageUrl || "");
+            setAnnPublished(ann.published);
         } else {
-            setBlogTitle("");
-            setBlogSlug("");
-            setBlogContent("");
-            setBlogCover("");
-            setBlogPublished(false);
+            setAnnTitle("");
+            setAnnSlug("");
+            setAnnContent("");
+            setAnnCover("");
+            setAnnPublished(false);
         }
-        setIsBlogDialogOpen(true);
+        setIsAnnDialogOpen(true);
     };
 
-    const handleSaveBlogPost = async () => {
-        if (!blogTitle || !blogSlug || !blogContent) {
+    const handleSaveAnnouncement = async () => {
+        if (!annTitle || !annSlug || !annContent) {
             toast.error("Please fill in all required fields");
             return;
         }
 
         try {
-            if (selectedPost) {
-                await updateBlogPost(selectedPost.id, {
-                    title: blogTitle,
-                    slug: blogSlug,
-                    content: blogContent,
-                    coverImageUrl: blogCover || undefined,
-                    published: blogPublished
+            if (selectedAnn) {
+                await updateAnnouncement(selectedAnn.id, {
+                    title: annTitle,
+                    slug: annSlug,
+                    content: annContent,
+                    coverImageUrl: annCover || undefined,
+                    published: annPublished
                 });
-                toast.success("Blog post updated successfully");
+                toast.success("Announcement updated successfully");
             } else {
-                await createBlogPost({
-                    title: blogTitle,
-                    slug: blogSlug,
-                    content: blogContent,
-                    coverImageUrl: blogCover || undefined,
-                    published: blogPublished
+                await createAnnouncement({
+                    title: annTitle,
+                    slug: annSlug,
+                    content: annContent,
+                    coverImageUrl: annCover || undefined,
+                    published: annPublished
                 });
-                toast.success("Blog post created successfully");
+                toast.success("Announcement created successfully");
             }
-            setIsBlogDialogOpen(false);
+            setIsAnnDialogOpen(false);
             loadData();
         } catch (error) {
-            toast.error("Failed to save blog post");
+            toast.error("Failed to save announcement");
         }
     };
 
-    const handleDeleteBlogPost = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this blog post?")) return;
+    const handleDeleteAnnouncement = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this announcement?")) return;
         try {
-            await deleteBlogPost(id);
-            toast.success("Blog post deleted");
+            await deleteAnnouncement(id);
+            toast.success("Announcement deleted");
             loadData();
         } catch {
-            toast.error("Failed to delete blog post");
+            toast.error("Failed to delete announcement");
         }
     };
 
@@ -151,13 +153,13 @@ export default function AdminCmsPage() {
         if (camp) {
             setCampTitle(camp.title);
             setCampDesc(camp.description || "");
-            setCampGoal(camp.goalAmount.toString());
-            setCampCurrent(camp.currentAmount.toString());
+            setCampTarget(camp.targetRevenue.toString());
+            setCampCurrent(camp.currentRevenue.toString());
             setCampActive(camp.isActive);
         } else {
             setCampTitle("");
             setCampDesc("");
-            setCampGoal("");
+            setCampTarget("");
             setCampCurrent("0");
             setCampActive(true);
         }
@@ -165,36 +167,36 @@ export default function AdminCmsPage() {
     };
 
     const handleSaveCampaign = async () => {
-        if (!campTitle || !campGoal) {
+        if (!campTitle || !campTarget) {
             toast.error("Please fill in all required fields");
             return;
         }
 
         try {
-            const goal = parseFloat(campGoal);
+            const target = parseFloat(campTarget);
             const current = parseFloat(campCurrent || "0");
-            if (isNaN(goal)) {
-                toast.error("Goal amount must be a number");
+            if (isNaN(target)) {
+                toast.error("Target revenue must be a number");
                 return;
             }
 
             if (selectedCamp) {
-                await updateDonationCampaign(selectedCamp.id, {
+                await updateSalesCampaign(selectedCamp.id, {
                     title: campTitle,
                     description: campDesc || undefined,
-                    goalAmount: goal,
-                    currentAmount: current,
+                    targetRevenue: target,
+                    currentRevenue: current,
                     isActive: campActive
                 });
-                toast.success("Donation campaign updated");
+                toast.success("Sales campaign updated");
             } else {
-                await createDonationCampaign({
+                await createSalesCampaign({
                     title: campTitle,
                     description: campDesc || undefined,
-                    goalAmount: goal,
+                    targetRevenue: target,
                     isActive: campActive
                 });
-                toast.success("Donation campaign created");
+                toast.success("Sales campaign created");
             }
             setIsCampDialogOpen(false);
             loadData();
@@ -206,7 +208,7 @@ export default function AdminCmsPage() {
     const handleDeleteCampaign = async (id: string) => {
         if (!confirm("Are you sure you want to delete this campaign?")) return;
         try {
-            await deleteDonationCampaign(id);
+            await deleteSalesCampaign(id);
             toast.success("Campaign deleted");
             loadData();
         } catch {
@@ -214,9 +216,9 @@ export default function AdminCmsPage() {
         }
     };
 
-    const filteredPosts = posts.filter(p =>
-        p.title.toLowerCase().includes(blogSearch.toLowerCase()) ||
-        p.slug.toLowerCase().includes(blogSearch.toLowerCase())
+    const filteredAnns = anns.filter(a =>
+        a.title.toLowerCase().includes(annSearch.toLowerCase()) ||
+        a.slug.toLowerCase().includes(annSearch.toLowerCase())
     );
 
     const filteredCamps = campaigns.filter(c =>
@@ -236,65 +238,65 @@ export default function AdminCmsPage() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Content Management (CMS)</h1>
-                <p className="text-muted-foreground mt-1">Manage public articles, campaigns, and donation goals.</p>
+                <p className="text-muted-foreground mt-1">Manage system announcements, help updates, and sales campaigns.</p>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full max-w-[400px] grid-cols-2 bg-muted/50 p-1 rounded-xl">
-                    <TabsTrigger value="blog" className="rounded-lg">
-                        <BookOpen className="h-4 w-4 mr-2" />
-                        Blog & News
+                    <TabsTrigger value="announcements" className="rounded-lg">
+                        <Megaphone className="h-4 w-4 mr-2" />
+                        Announcements
                     </TabsTrigger>
                     <TabsTrigger value="campaigns" className="rounded-lg">
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        Donation Goals
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        Sales Campaigns
                     </TabsTrigger>
                 </TabsList>
 
-                {/* BLOG TABS */}
-                <TabsContent value="blog" className="mt-6 space-y-4 outline-none">
+                {/* ANNOUNCEMENT TAB */}
+                <TabsContent value="announcements" className="mt-6 space-y-4 outline-none">
                     <div className="flex items-center justify-between gap-4">
                         <div className="relative flex-1 max-w-sm">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search blog posts..."
+                                placeholder="Search announcements..."
                                 className="pl-10"
-                                value={blogSearch}
-                                onChange={(e) => setBlogSearch(e.target.value)}
+                                value={annSearch}
+                                onChange={(e) => setAnnSearch(e.target.value)}
                             />
                         </div>
-                        <Button onClick={() => handleOpenBlogDialog(null)}>
+                        <Button onClick={() => handleOpenAnnDialog(null)}>
                             <Plus className="h-4 w-4 mr-2" />
-                            Create Post
+                            Create Announcement
                         </Button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredPosts.map((post) => (
-                            <Card key={post.id} className="overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow">
+                        {filteredAnns.map((ann) => (
+                            <Card key={ann.id} className="overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow">
                                 <div className="aspect-video w-full bg-muted relative flex items-center justify-center text-muted-foreground">
-                                    {post.coverImageUrl ? (
-                                        <img src={post.coverImageUrl} alt={post.title} className="object-cover w-full h-full" />
+                                    {ann.coverImageUrl ? (
+                                        <img src={ann.coverImageUrl} alt={ann.title} className="object-cover w-full h-full" />
                                     ) : (
-                                        <BookOpen className="h-10 w-10 opacity-30" />
+                                        <Megaphone className="h-10 w-10 opacity-30" />
                                     )}
                                     <div className="absolute top-3 right-3">
-                                        <Badge variant={post.published ? "default" : "secondary"} className={post.published ? "bg-green-500 hover:bg-green-600 text-white" : ""}>
-                                            {post.published ? "Published" : "Draft"}
+                                        <Badge variant={ann.published ? "default" : "secondary"} className={ann.published ? "bg-green-500 hover:bg-green-600 text-white" : ""}>
+                                            {ann.published ? "Live" : "Draft"}
                                         </Badge>
                                     </div>
                                 </div>
                                 <CardHeader className="p-4 pb-2">
-                                    <CardTitle className="text-lg line-clamp-1">{post.title}</CardTitle>
-                                    <CardDescription className="font-mono text-xs truncate">/{post.slug}</CardDescription>
+                                    <CardTitle className="text-lg line-clamp-1">{ann.title}</CardTitle>
+                                    <CardDescription className="font-mono text-xs truncate">/announcements/{ann.slug}</CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-4 pt-0 flex-1 flex flex-col justify-between">
-                                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{post.content}</p>
+                                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{ann.content}</p>
                                     <div className="flex gap-2 justify-end border-t pt-3">
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenBlogDialog(post)}>
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenAnnDialog(ann)}>
                                             <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
                                         </Button>
-                                        <Button size="sm" variant="destructive" onClick={() => handleDeleteBlogPost(post.id)}>
+                                        <Button size="sm" variant="destructive" onClick={() => handleDeleteAnnouncement(ann.id)}>
                                             <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                                         </Button>
                                     </div>
@@ -304,13 +306,13 @@ export default function AdminCmsPage() {
                     </div>
                 </TabsContent>
 
-                {/* CAMPAIGN TABS */}
+                {/* SALES CAMPAIGNS TAB */}
                 <TabsContent value="campaigns" className="mt-6 space-y-4 outline-none">
                     <div className="flex items-center justify-between gap-4">
                         <div className="relative flex-1 max-w-sm">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search campaigns..."
+                                placeholder="Search sales campaigns..."
                                 className="pl-10"
                                 value={campSearch}
                                 onChange={(e) => setCampSearch(e.target.value)}
@@ -324,9 +326,9 @@ export default function AdminCmsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {filteredCamps.map((camp) => {
-                            const goal = parseFloat(camp.goalAmount.toString()) || 1;
-                            const current = parseFloat(camp.currentAmount.toString()) || 0;
-                            const percent = Math.min(Math.round((current / goal) * 100), 100);
+                            const target = parseFloat(camp.targetRevenue.toString()) || 1;
+                            const current = parseFloat(camp.currentRevenue.toString()) || 0;
+                            const percent = Math.min(Math.round((current / target) * 100), 100);
 
                             return (
                                 <Card key={camp.id} className="flex flex-col justify-between hover:shadow-md transition-shadow">
@@ -342,14 +344,14 @@ export default function AdminCmsPage() {
                                     <CardContent className="p-5 pt-0 space-y-4">
                                         <div className="space-y-2">
                                             <div className="flex justify-between text-sm font-semibold">
-                                                <span>Raised: ${current.toLocaleString()}</span>
-                                                <span className="text-muted-foreground">Goal: ${goal.toLocaleString()}</span>
+                                                <span>Revenue: ${current.toLocaleString()}</span>
+                                                <span className="text-muted-foreground">Target: ${target.toLocaleString()}</span>
                                             </div>
                                             <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
                                                 <div className="bg-primary h-full transition-all duration-300" style={{ width: `${percent}%` }} />
                                             </div>
                                             <div className="text-right text-xs font-medium text-muted-foreground">
-                                                {percent}% of target reached
+                                                {percent}% of target revenue reached
                                             </div>
                                         </div>
 
@@ -369,12 +371,12 @@ export default function AdminCmsPage() {
                 </TabsContent>
             </Tabs>
 
-            {/* BLOG DIALOG */}
-            <Dialog open={isBlogDialogOpen} onOpenChange={setIsBlogDialogOpen}>
+            {/* ANNOUNCEMENT DIALOG */}
+            <Dialog open={isAnnDialogOpen} onOpenChange={setIsAnnDialogOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>{selectedPost ? "Edit Blog Post" : "Create Blog Post"}</DialogTitle>
-                        <DialogDescription>Write or modify blog updates that appear on your landing page.</DialogDescription>
+                        <DialogTitle>{selectedAnn ? "Edit Announcement" : "Create Announcement"}</DialogTitle>
+                        <DialogDescription>Write system announcements or news updates visible to external users.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="grid grid-cols-2 gap-4">
@@ -382,13 +384,12 @@ export default function AdminCmsPage() {
                                 <Label htmlFor="title">Title *</Label>
                                 <Input
                                     id="title"
-                                    placeholder="Enter post title"
-                                    value={blogTitle}
+                                    placeholder="Enter title"
+                                    value={annTitle}
                                     onChange={(e) => {
-                                        setBlogTitle(e.target.value);
-                                        // Auto-generate slug
-                                        if (!selectedPost) {
-                                            setBlogSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
+                                        setAnnTitle(e.target.value);
+                                        if (!selectedAnn) {
+                                            setAnnSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
                                         }
                                     }}
                                 />
@@ -397,9 +398,9 @@ export default function AdminCmsPage() {
                                 <Label htmlFor="slug">Slug *</Label>
                                 <Input
                                     id="slug"
-                                    placeholder="post-url-slug"
-                                    value={blogSlug}
-                                    onChange={(e) => setBlogSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}
+                                    placeholder="announcement-url-slug"
+                                    value={annSlug}
+                                    onChange={(e) => setAnnSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}
                                 />
                             </div>
                         </div>
@@ -409,8 +410,8 @@ export default function AdminCmsPage() {
                             <Input
                                 id="cover"
                                 placeholder="https://example.com/image.jpg"
-                                value={blogCover}
-                                onChange={(e) => setBlogCover(e.target.value)}
+                                value={annCover}
+                                onChange={(e) => setAnnCover(e.target.value)}
                             />
                         </div>
 
@@ -418,21 +419,21 @@ export default function AdminCmsPage() {
                             <Label htmlFor="content">Content *</Label>
                             <Textarea
                                 id="content"
-                                placeholder="Write post content here..."
+                                placeholder="Write content here..."
                                 rows={8}
-                                value={blogContent}
-                                onChange={(e) => setBlogContent(e.target.value)}
+                                value={annContent}
+                                onChange={(e) => setAnnContent(e.target.value)}
                             />
                         </div>
 
                         <div className="flex items-center space-x-2 pt-2">
-                            <Switch id="published" checked={blogPublished} onCheckedChange={setBlogPublished} />
+                            <Switch id="published" checked={annPublished} onCheckedChange={setAnnPublished} />
                             <Label htmlFor="published">Publish immediately</Label>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsBlogDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSaveBlogPost}>Save Post</Button>
+                        <Button variant="outline" onClick={() => setIsAnnDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveAnnouncement}>Save Announcement</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -441,15 +442,15 @@ export default function AdminCmsPage() {
             <Dialog open={isCampDialogOpen} onOpenChange={setIsCampDialogOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{selectedCamp ? "Edit Donation Campaign" : "Create Donation Campaign"}</DialogTitle>
-                        <DialogDescription>Configure campaign settings, fundraising targets, and raise progression.</DialogDescription>
+                        <DialogTitle>{selectedCamp ? "Edit Sales Campaign" : "Create SalesCampaign"}</DialogTitle>
+                        <DialogDescription>Configure B2B sales/revenue targets and active campaign details.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="space-y-2">
                             <Label htmlFor="ctitle">Campaign Title *</Label>
                             <Input
                                 id="ctitle"
-                                placeholder="e.g. Clean Water Campaign"
+                                placeholder="e.g. Q3 Sales Booster"
                                 value={campTitle}
                                 onChange={(e) => setCampTitle(e.target.value)}
                             />
@@ -459,7 +460,7 @@ export default function AdminCmsPage() {
                             <Label htmlFor="cdesc">Description</Label>
                             <Textarea
                                 id="cdesc"
-                                placeholder="Describe the goal of this fundraiser..."
+                                placeholder="Describe target audience or details..."
                                 rows={3}
                                 value={campDesc}
                                 onChange={(e) => setCampDesc(e.target.value)}
@@ -468,18 +469,18 @@ export default function AdminCmsPage() {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="cgoal">Goal Target ($) *</Label>
+                                <Label htmlFor="ctarget">Target Revenue ($) *</Label>
                                 <Input
-                                    id="cgoal"
+                                    id="ctarget"
                                     type="number"
                                     placeholder="50000"
-                                    value={campGoal}
-                                    onChange={(e) => setCampGoal(e.target.value)}
+                                    value={campTarget}
+                                    onChange={(e) => setCampTarget(e.target.value)}
                                 />
                             </div>
                             {selectedCamp && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="ccurrent">Current Raised ($)</Label>
+                                    <Label htmlFor="ccurrent">Current Revenue ($)</Label>
                                     <Input
                                         id="ccurrent"
                                         type="number"

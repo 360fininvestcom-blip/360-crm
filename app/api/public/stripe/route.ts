@@ -3,20 +3,21 @@ import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
-// Webhook endpoint to receive payments (Stripe/PayPal simulated webhook payload)
+// Webhook endpoint to receive SaaS customer payments (Stripe simulated webhook payload)
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        console.log("DEBUG: Received donation payment webhook payload:", body);
+        console.log("DEBUG: Received Stripe customer payment webhook payload:", body);
 
         // Required fields from stripe payment intent or checkout session success
         const email = body.email || body.data?.object?.customer_details?.email || body.customer_email;
         const amountCents = body.amount || body.data?.object?.amount_total || body.amount_total;
-        const fullName = body.name || body.data?.object?.customer_details?.name || body.customer_name || "Anonymous Donor";
+        const fullName = body.name || body.data?.object?.customer_details?.name || body.customer_name || "New Client";
+        const companyName = body.company || body.data?.object?.customer_details?.metadata?.company || body.metadata?.company;
         const campaignId = body.campaignId || body.data?.object?.metadata?.campaignId || body.metadata?.campaignId;
 
         if (!email || !amountCents) {
-            return NextResponse.json({ error: "Missing required donor email or amount" }, { status: 400 });
+            return NextResponse.json({ error: "Missing customer email or amount details" }, { status: 400 });
         }
 
         const amount = parseFloat((amountCents / 100).toFixed(2));
@@ -38,29 +39,30 @@ export async function POST(request: Request) {
         if (!contact) {
             const nameParts = fullName.split(" ");
             const firstName = nameParts[0] || "Anonymous";
-            const lastName = nameParts.slice(1).join(" ") || "Donor";
+            const lastName = nameParts.slice(1).join(" ") || "Client";
 
             contact = await prisma.contact.create({
                 data: {
                     firstName,
                     lastName,
                     email,
+                    company: companyName || null,
                     organizationId: org.id,
-                    tags: ["Donor", "Web Checkout"],
-                    source: "Stripe Donation",
+                    tags: ["Customer", "Stripe Checkout"],
+                    source: "Stripe Invoice",
                     customFields: {
-                        status: "Donor"
+                        status: "Active Customer"
                     }
                 }
             });
         } else {
-            // Append Donor tag if not present
-            if (!contact.tags.includes("Donor")) {
+            // Append Customer tag if not present
+            if (!contact.tags.includes("Customer")) {
                 await prisma.contact.update({
                     where: { id: contact.id },
                     data: {
                         tags: {
-                            set: [...contact.tags, "Donor"]
+                            set: [...contact.tags, "Customer"]
                         }
                     }
                 });
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "No pipeline configured for deals" }, { status: 400 });
         }
 
-        // Stage can be first stage or default closed-won stage
+        // Resolve won/closed stage name
         let defaultStage = "Closed Won";
         try {
             const stages = JSON.parse(pipeline.stages as string);
@@ -89,13 +91,13 @@ export async function POST(request: Request) {
             console.log("DEBUG: stages parse failed, using fallback Closed Won stage name");
         }
 
-        // 4. Create Donation Deal
+        // 4. Create Closed Deal
         const deal = await prisma.deal.create({
             data: {
                 organizationId: org.id,
                 contactId: contact.id,
                 pipelineId: pipeline.id,
-                name: `Donation: $${amount} - ${contact.firstName} ${contact.lastName || ""}`.trim(),
+                name: `Invoice Paid: $${amount} - ${contact.company || contact.firstName}`,
                 value: amount,
                 stage: defaultStage,
                 probability: 100
@@ -109,31 +111,31 @@ export async function POST(request: Request) {
                 contactId: contact.id,
                 dealId: deal.id,
                 type: "system",
-                title: "Donation Received",
-                description: `Successfully processed Stripe payment of $${amount.toFixed(2)} from ${fullName} (${email}).`
+                title: "Invoice Paid",
+                description: `Successfully processed Stripe invoice payment of $${amount.toFixed(2)} from ${fullName} (${email}).`
             }
         });
 
-        // 6. Update Donation Campaign progress if applicable
+        // 6. Update Sales Campaign revenue progress if applicable
         if (campaignId) {
             try {
-                const campaign = await prisma.donationCampaign.findFirst({
+                const campaign = await prisma.salesCampaign.findFirst({
                     where: {
                         id: campaignId,
                         organizationId: org.id
                     }
                 });
                 if (campaign) {
-                    const currentAmount = parseFloat(campaign.currentAmount.toString()) + amount;
-                    await prisma.donationCampaign.update({
+                    const currentRevenue = parseFloat(campaign.currentRevenue.toString()) + amount;
+                    await prisma.salesCampaign.update({
                         where: { id: campaign.id },
                         data: {
-                            currentAmount
+                            currentRevenue
                         }
                     });
                 }
             } catch (campErr) {
-                console.error("Failed to update campaign current raised amount:", campErr);
+                console.error("Failed to update sales campaign revenue progress:", campErr);
             }
         }
 

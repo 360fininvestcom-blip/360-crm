@@ -40,8 +40,8 @@ model Organization {
   contactStatuses  ContactStatus[]
   apiKeys          ApiKey[]
   userIntegrations UserIntegration[]
-  donationCampaigns DonationCampaign[]
-  blogPosts         BlogPost[]
+  salesCampaigns SalesCampaign[]
+  announcements  Announcement[]
 
   @@map("organizations")
 }
@@ -558,28 +558,28 @@ model Notification {
 }
 
 // ============================================
-// DONATION CAMPAIGNS
+// SALES CAMPAIGNS
 // ============================================
-model DonationCampaign {
+model SalesCampaign {
   id             String       @id @default(uuid()) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   title          String
   description    String?
-  goalAmount     Decimal      @default(0) @db.Decimal(15, 2) @map("goal_amount")
-  currentAmount  Decimal      @default(0) @db.Decimal(15, 2) @map("current_amount")
+  targetRevenue  Decimal      @default(0) @db.Decimal(15, 2) @map("target_revenue")
+  currentRevenue Decimal      @default(0) @db.Decimal(15, 2) @map("current_revenue")
   isActive       Boolean      @default(true) @map("is_active")
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  @@index([organizationId], map: "idx_campaigns_org")
-  @@map("donation_campaigns")
+  @@index([organizationId], map: "idx_sales_campaigns_org")
+  @@map("sales_campaigns")
 }
 
 // ============================================
-// BLOG POSTS
+// ANNOUNCEMENTS
 // ============================================
-model BlogPost {
+model Announcement {
   id             String       @id @default(uuid()) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -592,6 +592,6 @@ model BlogPost {
   updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   @@unique([organizationId, slug], name: "org_slug_unique")
-  @@index([organizationId], map: "idx_posts_org")
-  @@map("blog_posts")
+  @@index([organizationId], map: "idx_announcements_org")
+  @@map("announcements")
 }
