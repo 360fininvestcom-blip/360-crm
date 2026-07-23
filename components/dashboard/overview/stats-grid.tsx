@@ -93,7 +93,8 @@ export function StatsGrid() {
                     animate="show"
                     transition={{ delay: i * 0.1 }}
                 >
-                    <Card className="glass-panel hover:shadow-lg transition-all hover:-translate-y-1 duration-300">
+                    <Card className="glass-panel card-hover-effect overflow-hidden relative group border-primary/10">
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground">
                                 {stat.title}
@@ -101,7 +102,7 @@ export function StatsGrid() {
                             <stat.icon className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold flex items-center">
+                            <div className="text-2xl font-bold flex items-center bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent group-hover:from-blue-500 group-hover:to-indigo-500 transition-all duration-300">
                                 {stat.prefix}
                                 <NumberTicker value={stat.rawValue} />
                                 {stat.suffix}

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { CalendarCheck2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +79,12 @@ export function UpcomingTasks() {
                     </motion.div>
                 ))}
                 {(!Array.isArray(myTasks) || myTasks.length === 0) && (
-                    <p className="text-center text-muted-foreground py-8">No upcoming tasks.</p>
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground glass-panel rounded-xl bg-gradient-to-br from-primary/5 to-transparent border-primary/10 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(to_bottom,transparent,black)]" />
+                        <CalendarCheck2 className="h-10 w-10 mb-3 text-primary/40 animate-pulse relative z-10" />
+                        <p className="font-medium text-foreground relative z-10">No upcoming tasks</p>
+                        <p className="text-xs mt-1 relative z-10">You're all caught up!</p>
+                    </div>
                 )}
             </CardContent>
         </Card>

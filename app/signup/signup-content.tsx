@@ -41,8 +41,10 @@ export default function SignupContent() {
 
             if (data?.user) {
                 toast.success("Account created successfully!");
-                router.push("/dashboard");
-                router.refresh();
+                setTimeout(() => {
+                    router.push("/dashboard");
+                    router.refresh();
+                }, 1500);
             }
         } catch (error) {
             console.error("Signup error:", error);

@@ -84,9 +84,11 @@ export function ActivityTimeline() {
                 ))}
                 
                 {(!Array.isArray(myActivities) || myActivities.length === 0) && (
-                    <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
-                        <Activity className="h-8 w-8 mb-2 opacity-20" />
-                        <p>No recent activity</p>
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground glass-panel rounded-xl bg-gradient-to-br from-primary/5 to-transparent border-primary/10 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(to_bottom,transparent,black)]" />
+                        <Activity className="h-10 w-10 mb-3 text-primary/40 animate-pulse relative z-10" />
+                        <p className="font-medium text-foreground relative z-10">No recent activity</p>
+                        <p className="text-xs mt-1 relative z-10">Your timeline is clear.</p>
                     </div>
                 )}
             </CardContent>

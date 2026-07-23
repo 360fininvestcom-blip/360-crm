@@ -277,7 +277,7 @@ export default function LandingPageContent({
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <Card className="h-full hover:shadow-lg transition-shadow glass-panel">
+                  <Card className="h-full glass-panel border-primary/10 card-hover-effect">
                     <CardHeader>
                       <div className="flex items-center gap-2 text-primary mb-2">
                         <TrendingUp className="h-5 w-5" />
@@ -352,7 +352,7 @@ export default function LandingPageContent({
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {announcements.map((post) => (
-              <Card key={post.id} className="flex flex-col justify-between hover:shadow-md transition-shadow">
+              <Card key={post.id} className="flex flex-col justify-between glass-panel border-primary/10 card-hover-effect">
                 <CardHeader>
                   <CardTitle className="text-lg font-bold">{post.title}</CardTitle>
                   <CardDescription>
@@ -379,7 +379,7 @@ export default function LandingPageContent({
             <p className="text-muted-foreground mt-2">See how our AI dialer and automated pipelines can scale your sales operations.</p>
           </div>
 
-          <Card className="glass-panel border-white/5">
+          <Card className="glass-panel border-primary/20 shadow-glow-primary overflow-hidden relative">
             <CardContent className="p-6">
               <form onSubmit={handleDemoSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
