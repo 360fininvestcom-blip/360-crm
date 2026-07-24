@@ -31,7 +31,10 @@ export async function getEmailSequences(): Promise<EmailSequence[]> {
         SELECT * FROM email_sequences
         ORDER BY created_at DESC
     `;
-    return sequences as EmailSequence[];
+    return (sequences as any[]).map(seq => ({
+        ...seq,
+        steps: typeof seq.steps === 'string' ? JSON.parse(seq.steps) : seq.steps
+    })) as EmailSequence[];
 }
 
 export async function getSMTPConfigs(): Promise<SMTPConfig[]> {

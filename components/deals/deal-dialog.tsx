@@ -239,7 +239,7 @@ export function DealDialog({
                                 <SelectValue placeholder="Select stage" />
                             </SelectTrigger>
                             <SelectContent>
-                                {stages.map((stage) => (
+                                {Array.isArray(stages) && stages.map((stage) => (
                                     <SelectItem key={stage.id} value={stage.id}>
                                         {stage.name}
                                     </SelectItem>

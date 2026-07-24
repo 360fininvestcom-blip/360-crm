@@ -40,7 +40,12 @@ export async function fetchPipelines(): Promise<Pipeline[]> {
     const data = await prisma.pipeline.findMany({
         orderBy: { createdAt: "asc" }
     });
-    return data;
+    
+    // Ensure stages are properly parsed if they were stored as a string
+    return data.map(pipeline => ({
+        ...pipeline,
+        stages: typeof pipeline.stages === 'string' ? JSON.parse(pipeline.stages) : pipeline.stages
+    })) as any;
 }
 
 export async function fetchActivities(limit = 20): Promise<Activity[]> {
