@@ -71,14 +71,11 @@ export function CallWidget() {
         isInCall,
         currentNumber,
         callStatus,
-        lastCallStatus,
         callDuration,
         closeDialer,
         openDialer,
         setCurrentNumber,
         startCall,
-        callStartedAt,
-        autoDialerQueue,
         autoDialerActive,
         isAutoDialerPaused,
         toggleAutoDialerPause,
@@ -221,7 +218,7 @@ export function CallWidget() {
                 id: contact.id,
                 updates: {
                     status: status === "answered" ? "contacted" : contact.status,
-                    lastCallAt: new Date() as any,
+                    lastCallAt: new Date().toISOString(),
                     lastCallStatus: status
                 }
             });
