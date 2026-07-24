@@ -5,6 +5,8 @@ import { Phone, User, History as HistoryIcon, Loader2, Sparkles, MessageSquare, 
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useCallLogs } from "@/hooks/use-calls";
+import { transcribeAndSummarizeCallLog } from "@/actions/copilot";
+import { toast } from "sonner";
 
 interface CallHistoryProps {
     onDial: (number: string, name?: string) => void;
@@ -14,6 +16,23 @@ interface CallHistoryProps {
 export const CallHistory = React.memo(({ onDial, contactId }: CallHistoryProps) => {
     const { data: calls = [], isLoading } = useCallLogs(20, contactId);
     const [expandedCallId, setExpandedCallId] = useState<string | null>(null);
+    const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
+
+    const handleSummarize = async (callId: string) => {
+        setAnalyzingIds(prev => new Set(prev).add(callId));
+        try {
+            await transcribeAndSummarizeCallLog(callId);
+            toast.success("Call summarized successfully");
+        } catch (error) {
+            toast.error("Failed to summarize call");
+        } finally {
+            setAnalyzingIds(prev => {
+                const next = new Set(prev);
+                next.delete(callId);
+                return next;
+            });
+        }
+    };
 
     if (isLoading) {
         return (
@@ -120,11 +139,19 @@ export const CallHistory = React.memo(({ onDial, contactId }: CallHistoryProps) 
                                             <div className="text-muted-foreground bg-muted/40 p-2.5 rounded-lg border border-border/30 whitespace-pre-line leading-relaxed">
                                                 {call.summary}
                                             </div>
-                                        ) : (
+                                        ) : analyzingIds.has(call.id) ? (
                                             <div className="flex items-center gap-2 text-muted-foreground p-2.5 bg-muted/30 rounded-lg">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                                 <span>AI Copilot is analyzing call log...</span>
                                             </div>
+                                        ) : (
+                                            <button 
+                                                onClick={() => handleSummarize(call.id)}
+                                                className="flex items-center justify-center w-full gap-2 text-primary p-2.5 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors border border-primary/20"
+                                            >
+                                                <Sparkles className="h-4 w-4" />
+                                                <span>Generate AI Summary</span>
+                                            </button>
                                         )}
                                     </div>
 
@@ -138,10 +165,14 @@ export const CallHistory = React.memo(({ onDial, contactId }: CallHistoryProps) 
                                             <div className="text-muted-foreground bg-muted/40 p-2.5 rounded-lg border border-border/30 font-mono text-[10px] whitespace-pre-line leading-relaxed max-h-[160px] overflow-y-auto">
                                                 {call.transcription}
                                             </div>
-                                        ) : (
+                                        ) : analyzingIds.has(call.id) ? (
                                             <div className="flex items-center gap-2 text-muted-foreground p-2.5 bg-muted/30 rounded-lg">
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                                 <span>Transcribing call recording...</span>
+                                            </div>
+                                        ) : (
+                                            <div className="text-muted-foreground italic text-[10px] p-2">
+                                                No transcription available. Generate an AI summary to create a simulated transcript.
                                             </div>
                                         )}
                                     </div>

@@ -44,10 +44,11 @@ import {
 import { getTestContacts } from "@/actions/contacts";
 import { Loader2 } from "lucide-react";
 
-// Initial node types
 const nodeTypes = {
     trigger: TriggerNode,
     email: ActionNode,
+    sms: ActionNode,
+    whatsapp: ActionNode,
     action: ActionNode,
     delay: DelayNode,
     condition: ConditionNode,
@@ -176,6 +177,12 @@ function BuilderInternal({ workflow }: WorkflowBuilderProps) {
         } else if (type === 'email') {
             defaultData.actionType = 'email';
             defaultData.label = 'Send Welcome Email';
+        } else if (type === 'sms') {
+            defaultData.actionType = 'sms';
+            defaultData.label = 'Send SMS Message';
+        } else if (type === 'whatsapp') {
+            defaultData.actionType = 'whatsapp';
+            defaultData.label = 'Send WhatsApp Message';
         }
 
         const newNode: Node = {
@@ -254,6 +261,12 @@ function BuilderInternal({ workflow }: WorkflowBuilderProps) {
                                 <Button variant="outline" size="sm" className="justify-start gap-2" onClick={() => onAddNode('email')}>
                                     <div className="w-2 h-2 rounded-full bg-green-500" /> Send Email
                                 </Button>
+                                <Button variant="outline" size="sm" className="justify-start gap-2" onClick={() => onAddNode('sms')}>
+                                    <div className="w-2 h-2 rounded-full bg-blue-500" /> Send SMS
+                                </Button>
+                                <Button variant="outline" size="sm" className="justify-start gap-2" onClick={() => onAddNode('whatsapp')}>
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500" /> Send WhatsApp
+                                </Button>
                                 <Button variant="outline" size="sm" className="justify-start gap-2" onClick={() => onAddNode('delay')}>
                                     <div className="w-2 h-2 rounded-full bg-yellow-500" /> Delay
                                 </Button>
@@ -329,6 +342,28 @@ function BuilderInternal({ workflow }: WorkflowBuilderProps) {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* SMS/WhatsApp Config */}
+                                {(selectedNode.type === 'sms' || selectedNode.type === 'whatsapp') && (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label>Step Label</Label>
+                                            <Input
+                                                value={selectedNode.data.label as string}
+                                                onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Message Content</Label>
+                                            <textarea
+                                                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                placeholder={`Enter ${selectedNode.type} message...`}
+                                                value={selectedNode.data.messageContent as string || ''}
+                                                onChange={(e) => updateNodeData(selectedNode.id, { messageContent: e.target.value })}
+                                            />
                                         </div>
                                     </div>
                                 )}

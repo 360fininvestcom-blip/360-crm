@@ -2,7 +2,7 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Mail, Tag, Clock, GitBranch, Zap, PlusCircle, LucideIcon } from 'lucide-react';
+import { Mail, Tag, Clock, GitBranch, Zap, PlusCircle, MessageSquare, Smartphone, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ============================================
@@ -40,7 +40,7 @@ export const TriggerNode = memo(({ data, selected }: NodeProps) => {
 // ACTION NODE
 // ============================================
 export const ActionNode = memo(({ data, selected }: NodeProps) => {
-    const Icon = data.actionType === 'email' ? Mail : data.actionType === 'tag' ? Tag : PlusCircle;
+    const Icon = data.actionType === 'email' ? Mail : data.actionType === 'sms' ? MessageSquare : data.actionType === 'whatsapp' ? Smartphone : data.actionType === 'tag' ? Tag : PlusCircle;
     return (
         <NodeWrapper title="Action" icon={Icon} color="bg-green-500/10 text-green-600" selected={selected}>
             <Handle type="target" position={Position.Top} className="w-3 h-3 bg-green-500" />

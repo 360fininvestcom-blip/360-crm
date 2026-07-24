@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import {
     Dialog,
@@ -32,6 +32,7 @@ import { useCreateContact, useUpdateContact, useContactStatuses } from "@/hooks/
 import type { Contact } from "@/types";
 import { CallHistory } from "@/components/dashboard/dialer/call-history";
 import { useDialerStore } from "@/lib/stores";
+import { pusherClient } from "@/lib/pusher-client";
 
 interface ContactFormData {
     firstName: string;
@@ -136,6 +137,38 @@ export function ContactDialog({
         }
     }, [contact, reset]);
 
+    const [activeUsers, setActiveUsers] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (!contact || !open) {
+            setActiveUsers([]);
+            return;
+        }
+
+        const channel = pusherClient.subscribe(`presence-contact-${contact.id}`);
+        
+        channel.bind("pusher:subscription_succeeded", (members: any) => {
+            const users: any[] = [];
+            members.each((member: any) => users.push({ id: member.id, ...member.info }));
+            setActiveUsers(users);
+        });
+
+        channel.bind("pusher:member_added", (member: any) => {
+            setActiveUsers((prev) => {
+                if (prev.find(u => u.id === member.id)) return prev;
+                return [...prev, { id: member.id, ...member.info }];
+            });
+        });
+
+        channel.bind("pusher:member_removed", (member: any) => {
+            setActiveUsers((prev) => prev.filter((u) => u.id !== member.id));
+        });
+
+        return () => {
+            pusherClient.unsubscribe(`presence-contact-${contact.id}`);
+        };
+    }, [contact, open]);
+
     const onSubmit = async (data: ContactFormData) => {
         try {
             if (isEditing && contact) {
@@ -179,8 +212,17 @@ export function ContactDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                    <DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
                         {isEditing ? "Edit Contact" : "Add New Contact"}
+                        {activeUsers.length > 1 && (
+                            <div className="flex -space-x-2 ml-4">
+                                {activeUsers.map((user) => (
+                                    <div key={user.id} className="w-6 h-6 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-[10px] font-bold text-primary uppercase" title={user.name || "User"}>
+                                        {(user.name || "U").charAt(0)}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </DialogTitle>
                     <DialogDescription>
                         {isEditing
