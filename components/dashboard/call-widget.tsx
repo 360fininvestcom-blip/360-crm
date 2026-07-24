@@ -218,7 +218,7 @@ export function CallWidget() {
                 id: contact.id,
                 updates: {
                     status: status === "answered" ? "contacted" : contact.status,
-                    lastCallAt: new Date().toISOString(),
+                    lastCallAt: new Date(),
                     lastCallStatus: status
                 }
             });
